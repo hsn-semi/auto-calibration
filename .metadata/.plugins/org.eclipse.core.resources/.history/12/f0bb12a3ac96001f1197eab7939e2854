@@ -1,0 +1,5758 @@
+/**
+  ******************************************************************************
+  * @file    OneMultitubController/main.c
+  * @author  Andreas @ Blink AG
+  * @version V001
+  * @date    09-July-2021
+  * @derived from OneMainController    2021-07-09
+  * @brief   Main program body
+  * @changes 2022-05-03 Filter Speed, Limits Table
+  *
+  ******************************************************************************
+
+  */ 
+
+/* Includes ------------------------------------------------------------------*/
+//#include "stm32f4_discovery.h"
+#include "stm32f4xx_conf.h"
+#include "stm32f4xx_tim.h"
+#include "stm32f4xx_rcc.h"
+
+#include <stdio.h>
+#include "stdlib.h"
+#include "string.h"
+
+#include "defines.h"
+#include "main.h"
+
+#include "uartpc.h"
+
+
+#include "stepmotor.h"
+#include "exposure.h"
+
+
+#include "i2c.h"
+#include "can.h"
+
+
+#include "stm32f4xx_it.h"
+//#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+//#include <termios.h>
+#include <math.h>
+#include <stdint.h>
+
+
+
+/* Private define ------------------------------------------------------------*/
+/* Private macro -------------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
+
+//TIM_OCInitTypeDef  TIM_OCInitStructure;
+
+
+
+//uint16_t PhaseCurrent = 0;
+
+unsigned char LogActive;
+
+
+TypeScriptEntry Script[MAX_SCRIPT_ENTRIES];
+TypeScriptControl ScriptControl;
+
+
+int32_t NtcLocal;
+
+
+TypeDemoPcr DemoPcr;
+
+
+
+uint8_t CommunicationPort;
+
+uint8_t rtoggel = 0;
+
+volatile char c;
+int32_t motor;
+uint32_t ui;
+uint8_t uc;
+
+
+char ReceiveBuffer[RX_BUFFER_SIZE];
+char PcrReceiveBuffer[RX_BUFFER_SIZE];
+
+char strTemp[RX_BUFFER_SIZE];
+char strt[20];
+
+uint16_t DemoCounter = 0;
+
+#define LED_COUNT_OFF   10000
+#define LED_COUNT_ON    20000 // =reset counter
+uint32_t ledcount = 0;
+
+uint8_t LedRedCount = 0;
+uint8_t LedRedSwitch = 0;
+#define LED_RED_MAX        100 // Periode in 1/100s
+#define LED_RED_STATE_ON   50
+#define LED_RED_STATE_OFF  2
+
+
+
+uint16_t AdcConversionResult[NUMBER_OF_CONVERSION_RESULTS];//Stores converted values via DMA
+int32_t BoardTemperature;
+
+
+TypeFilter Filter;
+TypeDateTime FilterDateTime;
+
+TypeDateTime QcDateTime;
+
+
+TypeDarkfield Darkfield;
+
+TypeFanControl FanControl;
+
+
+uint8_t ValidCommandReceived = 0; // 1, if first valid command via UART from PC received - triggers LED-Ring and Button
+int32_t TimeWithoutValidCommand = 0;
+
+uint8_t LastAnimationButton = 0;//remembers the Index of the last Animation set by ToolBox
+uint8_t LastAnimationRing = 0;//remembers the Index of the last Animation set by ToolBox
+uint8_t ReferenceAnimationActive = 0;//1 if reference Animation is active
+
+uint32_t SystemTimeIn100ms = 0;
+
+/* measures DC-Voltages */
+uint32_t Voltage[NUMBER_OF_VOLTAGE];
+/* measures DC-Current */
+uint32_t Current[NUMBER_OF_CURRENT];
+
+int32_t BlinkXSize = 0;
+
+
+
+
+
+/* Private function prototypes -----------------------------------------------*/
+
+
+/* Private functions ---------------------------------------------------------*/
+
+// ********************************************** //
+// ***              Main Program              *** //
+// ***         of Project AraController5      *** //
+// ***                                        *** //
+// ***          A.St�rker, Blink AG           *** //
+// ***                                        *** //
+// ********************************************** //
+
+int main(void)
+{
+  /*!< At this stage the microcontroller clock setting is already configured, 
+       this is done through SystemInit() function which is called from startup
+       file (startup_stm32f4xx.s) before to branch to application main.
+       To reconfigure the default setting of SystemInit() function, refer to
+       system_stm32f4xx.c file
+     */
+
+	uint8_t it;
+
+	/* Set all unused Pins to Output Low */
+	GPIOConfigUnusedPins();
+
+    /* GPIO-Port-Configuration */
+    GPIOConfig();
+
+    /*debug
+    DebugInitTimer1();
+   while(1)
+   {
+		for(ledcount = 0 ; ledcount < 10000 ; ledcount++)
+		{
+			asm("nop");
+		}
+		TIM_SetCompare1(TIM1, 12);
+		TIM_SetCompare1(TIM1, 15);
+		TIM_SetCompare1(TIM1, 18);
+   }
+   */
+
+
+
+    /* Configuration of Timer */
+    SystemTimerConfig();
+
+    /* Log-data: off //0 - off, 3 - Optic, Servo, Voltages, Local Temperatures  */
+    SetLogOutput(3);
+
+
+    /* ADC Config */
+    ADCConfig();
+
+
+    /* Init USARTs */
+    UartPcInit();
+
+
+    /* Check Hardware Version */
+    uc =  ReadHardwareVersion();
+    if(uc > 0x00)//if not BlinkX2IpticController_A
+    {
+    	while(1)
+    	{
+    		Delayms(50);
+    		LedRed(ON);
+    		Delayms(50);
+    		LedRed(OFF);
+    		UartPcAppendMessageToTxQueue("incompatible Firmware-Version - Firmware requires BlinkX2OpticController_A !", 76);
+    		UartPcWorkTx();
+    	}
+    }
+
+
+    /* Init I2C for EEPROM, Exposure Current (INA236B) */
+    I2cInit(I2C1);
+
+    Delayms(50);
+
+    /* Init I2C for ADC LTC2481*/
+    I2cInit(I2C2);
+
+   Delayms(100);
+
+
+
+
+
+
+    /* init ADC2481 with Gain 1, external input, 50/60Hz rejection, Speed 2x */
+   /* one conversion takes 74ms at speed 2x */
+   I2cSetModeLTC2481(0, 0, 0, 1);
+   Delayms(50);
+   I2cSetModeLTC2481(0, 0, 0, 1);
+
+    I2cINA236SetConfig(/*range*/INA236_RANGE_20, /*average*/INA236_AVERAGE_64, /*bustime*/INA236_TIME_1100, /*shunttime*/INA236_TIME_1100, /*mode*/INA236_MODE_SHUNT_VOLTAGE_CONTINOUS);
+    I2cINA236SetRegisterPointer(INA236_SHUNT_VOLTAGE_REGISTER);
+    /* config TMP275  to highest resolution
+    I2cTMP275Config(0x03);
+    I2cTMP275SetTemperatureRegister();*/
+
+
+
+	/* this is the Opzic-Controller */
+	MyCanId = CAN_ID_OPTIC;
+
+
+    /* Init CAN-Bus as Controller */
+    CanInit(MyCanId);
+
+
+
+    /* wait for AraTerm_E (LTC2481) to get ready */
+    Delayms(200);
+
+
+    /* Init Timers and Pins for Servos */
+    StepmotorInit();
+
+
+    /* Init Timers and Pins for Exposure, must be after I2C is initialized */
+    ExposureInit();
+
+    /* Init Fan Exposure-LED */
+    FanInit();
+
+
+
+    memset(Script, 0, sizeof(Script));
+    memset(&ScriptControl, 0, sizeof(ScriptControl));
+
+
+
+
+    /* - - - - - - - - - - - - - - -  - - - */
+
+    /* ToDo: Reference Drive */
+    //StepmotorReferenceDrive(MOTOR_X);
+
+
+
+    /* use USART Communication Port*/
+    CommunicationPort = COMMUNICATION_PORT_UART;
+
+   while (1)
+   {
+
+	   if(CommunicationPort == COMMUNICATION_PORT_CAN)
+	   {
+		   /*
+			   if(CAN_Receive(ReceiveBuffer, RX_BUFFER_SIZE - 1) != 0 )
+			   {
+					// complete string received
+					//Decoder(ReceiveBuffer);
+			   }
+		   */
+	   }
+	   if(CommunicationPort == COMMUNICATION_PORT_UART)
+	   {
+			   if(UartPcReceive(ReceiveBuffer, RX_BUFFER_SIZE - 1) != 0 )
+			   {
+					/* complete string received */
+					Decoder(ReceiveBuffer);
+			   }
+			   /* Work-Function */
+			   UartPcWorkTx();
+	   }
+
+
+
+
+	  /* - - - Step Motors - - - */
+	  StepmotorWork();
+
+	  /* - - - CAN RX work - - - */
+	  CanRxWork();
+
+	  /* every 1ms */
+	  if(Go1ms)
+	  {
+			  Go1ms = 0;
+
+			  /* - - - CAN TX work - - - */
+			  CanTxWork();
+
+	  }
+
+	  if(Go10ms)
+	  {
+
+		  Go10ms = 0;
+
+		  /* - - - Stepmotor Speed control - - - */
+		  StepmotorRampWork();
+
+
+
+		  /* - - - I2c execution - - - */
+		  WorkI2c();
+
+		  /* - - - update and process Exposure measurements - - - */
+		  ExposureWork();
+
+		  /* - - - Fan - - - */
+		  WorkFan();
+		
+
+
+
+
+		  /* LED Lifesign */
+		  LedGreen(OFF);
+
+
+	  }
+
+	  /* - - for work-functions on fixed time interval of 100ms - - */
+	  if(GoTimeBase)
+	  {
+	 		GoTimeBase = 0;
+
+	 		/* LED Lifesign */
+	 		LedGreen(ON);
+
+
+	 		/* - - - Sending of Log-Data  - - - */
+	 		WorkSendLogData();
+
+
+
+	 		/* - - - get ADC-Data and restart ADC - - - */
+	 		WorkAdc();
+
+
+
+
+
+	 		/* - - - Script execution - - - */
+			WorkScript();
+
+
+			/* - - - Demo execution - - - */
+			//WorkDemo();
+			//call calibraion loop
+			my_main();
+
+
+	  }
+
+
+
+
+	  /* - - - - - - - - */
+
+    }//while
+}
+//CALIBRATION LOOP
+// Constants and parameter array 'a'
+//void RunCalibration(void)
+	// Function to predict power
+double power_prediction(double I, double U, double F){
+	double a[7] = {-1.0308965914362327e-06, 0.0032028020975438886, -9.61069993725348e-05, 0.0006994085074554306, -0.0027937880003797953, 1.2848606467600974e-06, -0.00018061605698728428};
+
+
+    	return (a[0] * I * I + a[1] * I) * (a[2] * I + a[3] * U * U + a[4] * U + a[5] * F + a[6]);
+}
+
+
+
+// Function to adjust LED current
+void adjust_LED(double *I, double current_power, double previous_power)
+{
+    const double tolerance = 1e-3; // Set the tolerance value
+    double difference = fabs(current_power - previous_power);
+
+    // Check if the power difference is small enough
+    if (difference <= tolerance || difference == 0) {
+        // If within tolerance, we can return
+        return;
+    }
+
+    // Adjust the current based on the power difference
+    if (current_power > previous_power) {
+        *I -= 0.1; // Decrease current
+    } else {
+        *I += 0.1; // Increase current
+    }
+
+    // Ensure current stays within bounds (45 < I_current < 650)
+    if (*I < 45 || *I > 650) {
+        strcpy(strTemp,"Current out of range, stopping process\n");
+        SendToCommunicationPort(strTemp, strlen(strTemp));
+        exit(1); // Exit the program or handle the error
+    }
+}
+
+// Main control loop
+int my_main() {
+
+    double I = 50.0, U = 0, F = 0;  // Initialize current, voltage, and photocurrent
+    double previous_power = 0;  // Track the previous power
+    double current_power;
+    char strt[20];
+
+    unsigned char port = 0; // port for setting the current
+
+    // Try block to simulate UART communication (replace this with actual serial communication logic)
+//    while (1) {  // Infinite loop to simulate repeated checks
+//    for (int i=0; i<10; i++){
+        // Simulate reading from UART (replace this part with actual UART reading)
+
+        // Read and decode I, U, F (replace with actual UART reading logic)
+
+        U = ExposureControl[EXPOSURE_A].voltage * 1e-3;
+        I = ExposureControl[EXPOSURE_A].current;
+        F = ExposureControl[EXPOSURE_A].brightness;
+
+
+        strcpy(strTemp,"Current: ");
+        itoa(I, strt, 10);
+        strcat(strTemp, strt);
+        strcat(strTemp, " Voltage:");
+        itoa(U, strt, 10);
+        strcat(strTemp, strt);
+        strcat(strTemp, ";");
+        strcat(strTemp, "Brightness Factor: ");
+        itoa(F, strt, 10);
+        strcat(strTemp, strt);
+        strcat(strTemp, ";");
+        SendToCommunicationPort(strTemp, strlen(strTemp));
+        // If values for I, U, F are valid
+        if (I != 0 && U != 0 && F != 0 && U<=14 && U>=11) {
+            // Predict current power using the prediction function
+
+            current_power = power_prediction(I, U, F);
+
+            strcpy(strTemp,"Power: ");
+            itoa(current_power, strt, 10);
+            strcat(strTemp, strt);
+
+            // If first iteration, set previous_power to current_power
+            if (previous_power == 0) {
+                previous_power = current_power;
+            }
+
+            // Call the function to adjust the LED based on current power and previous power
+            adjust_LED(&I, current_power, previous_power);
+
+            // Set the hardware current using the calculated I value
+            ExposureSetCurrent (port, (uint16_t)I); // pass the current value (I) to the hardware
+
+//            printf("Adjusted Current: %f\n", I);
+            strcpy(strTemp,"Adjusted Current: ");
+            itoa(I, strt, 10);
+            strcat(strTemp, strt);
+            current_power = power_prediction(I, U, F);
+            // Update previous power
+            previous_power = current_power;
+        }
+    }
+//    Delayms(100000000);
+//return 0;
+
+
+
+
+
+
+
+// ******************************************************************* //
+// ***           EnableTimerPeriphClock()                          *** //
+// ***             enables timer clock                             *** //
+// ***            Input: TIM1 ... TIM14                            *** //
+// ***                 return: none                                *** //
+// ******************************************************************* //
+void EnableTimerPeriphClock(TIM_TypeDef* TIMX)
+{
+
+	if(TIMX == TIM1)
+	{
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+	}
+	if(TIMX == TIM2)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+	}
+	if(TIMX == TIM3)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
+	}
+	if(TIMX == TIM4)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+	}
+	if(TIMX == TIM5)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
+	}
+	if(TIMX == TIM6)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
+	}
+	if(TIMX == TIM7)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM7, ENABLE);
+	}
+	if(TIMX == TIM8)
+	{
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM8, ENABLE);
+	}
+	if(TIMX == TIM9)
+	{
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM9, ENABLE);
+	}
+	if(TIMX == TIM10)
+	{
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM10, ENABLE);
+	}
+	if(TIMX == TIM11)
+	{
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM11, ENABLE);
+	}
+	if(TIMX == TIM12)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM12, ENABLE);
+	}
+	if(TIMX == TIM13)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM13, ENABLE);
+	}
+	if(TIMX == TIM14)
+	{
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM14, ENABLE);
+	}
+}
+
+// ******************************************************************* //
+// ***               IsTimerOnAPB2()                               *** //
+// ***      checks, if timer source is connected to APB2           *** //
+// ***            Input: TIM1 ... TIM14                            *** //
+// ***            return: 0 - APB1 (normal clock frequency)        *** //
+// ***                    1 - APB2 (double clock frequency)        *** //
+// ******************************************************************* //
+uint8_t IsTimerOnAPB2(TIM_TypeDef* TIMX)
+{
+	if(   (TIMX == TIM1)
+	   || (TIMX == TIM8)
+	   || (TIMX == TIM9)
+	   || (TIMX == TIM10)
+	   || (TIMX == TIM11) )
+	{
+		return 1;
+	}
+
+	return 0;
+
+
+}
+
+// ******************************************************************* //
+// ***               SetTimerCompareValue()                        *** //
+// ***      sets compare values of timer channel                   *** //
+// ***            Input: TIM1 ... TIM14                            *** //
+// ***                   ch: 1...4                                 *** //
+// ***                   val: PWM compare value to set             *** //
+// ***            return: none                                     *** //
+// ******************************************************************* //
+void SetTimerCompareValue(TIM_TypeDef* TIMX, uint8_t ch, uint16_t val)
+{
+	  switch(ch)
+	  {
+		  case 1:
+			  TIM_SetCompare1(TIMX, val);//PWM Channel 1
+		  break;
+		  case 2:
+			  TIM_SetCompare2(TIMX, val);//PWM Channel 3
+		  break;
+		  case 3:
+			  TIM_SetCompare3(TIMX, val);//PWM Channel 4
+		  break;
+		  case 4:
+			  TIM_SetCompare4(TIMX, val);//PWM Channel 4
+		  break;
+	  }
+
+	  return;
+
+}
+
+// ******************************************************************* //
+// ***               SetDacValue()                                 *** //
+// ***      sets compare values of timer channel                   *** //
+// ***            Input: channel: DAC_Channel_1 or DAC_Channel_2   *** //
+// ***                   val: DAC value to set                     *** //
+// ***            return: none                                     *** //
+// ******************************************************************* //
+void SetDacValue(uint32_t channel, uint16_t val)
+{
+		  /* set value */
+		  if(channel == DAC_Channel_1)
+		  {
+			  DAC_SetChannel1Data(DAC_Align_12b_R, val);
+		  }
+		  if(channel == DAC_Channel_2)
+		  {
+			  DAC_SetChannel2Data(DAC_Align_12b_R, val);
+		  }
+
+}
+
+// ********************************************** //
+// ***     GPIOConfigUnusedPins()             *** //
+// ***                                        *** //
+// ***    Configures unused GPIO-Pins         *** //
+// ***        to Output, Low Level            *** //
+// ***                                        *** //
+// ********************************************** //
+void GPIOConfigUnusedPins(void)
+{
+  GPIO_InitTypeDef 	GPIO_InitStructure;
+
+  /* Enable SYSCFG clock */
+   RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+  /* GPIOD, GPIOC, GPIOB and GPIOA clock enable */
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB | RCC_AHB1Periph_GPIOC  | RCC_AHB1Periph_GPIOD, ENABLE);
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+
+  /* GPIOG Configuration:  to output */
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+  //Port A
+  GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTA;
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
+  GPIO_ResetBits(GPIOA, UNUSED_PINS_PORTA);
+  //Port B
+  GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTB;
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+  GPIO_ResetBits(GPIOB, UNUSED_PINS_PORTB);
+  //Port C
+  GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTC;
+  GPIO_Init(GPIOC, &GPIO_InitStructure);
+  GPIO_ResetBits(GPIOC, UNUSED_PINS_PORTC);
+  //Port D
+  //GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTD;
+  //GPIO_Init(GPIOD, &GPIO_InitStructure);
+  //GPIO_ResetBits(GPIOD, UNUSED_PINS_PORTD);
+  //Port E
+  //GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTE;
+  //GPIO_Init(GPIOE, &GPIO_InitStructure);
+  //GPIO_ResetBits(GPIOE, UNUSED_PINS_PORTE);
+  //Port F
+  //GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTF;
+  //GPIO_Init(GPIOF, &GPIO_InitStructure);
+  //GPIO_ResetBits(GPIOF, UNUSED_PINS_PORTF);
+  //Port G
+  //GPIO_InitStructure.GPIO_Pin = UNUSED_PINS_PORTG;
+  //GPIO_Init(GPIOG, &GPIO_InitStructure);
+  //GPIO_ResetBits(GPIOG, UNUSED_PINS_PORTG);
+
+
+
+}
+
+
+// ********************************************** //
+// ***         GPIOConfig()                   *** //
+// ***                                        *** //
+// ***    Configures the LED-GPIO-Pins        *** //
+// ***                                        *** //
+// ***                                        *** //
+// ********************************************** //
+void GPIOConfig(void)
+{
+	  GPIO_InitTypeDef 	GPIO_InitStructure;
+
+	  /* Enable SYSCFG clock */
+	   RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	  /* GPIOD, GPIOC, GPIOB and GPIOA clock enable */
+	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | LED_GREEN_GPIO_CLOCK | LED_RED_GPIO_CLOCK , ENABLE);
+	  RCC_AHB1PeriphClockCmd( HW1_GPIO_CLOCK | HW2_GPIO_CLOCK | HW3_GPIO_CLOCK, ENABLE);
+
+	  /* GPIOG Configuration:  Output */
+
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	  GPIO_InitStructure.GPIO_Pin =  LED_GREEN_PIN;
+	  GPIO_Init(LED_GREEN_GPIO_PORT, &GPIO_InitStructure);
+	  GPIO_InitStructure.GPIO_Pin =  LED_RED_PIN;
+	  GPIO_Init(LED_RED_GPIO_PORT, &GPIO_InitStructure);
+
+
+	  /* GPIOA Configuration:  input */
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;//GPIO_PuPd_UP ;
+	  GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_0;//WAKEUP-PIN
+	  GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+
+		/* GPIOC Configuration:  inputs for Hardware-Version */
+	   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;//GPIO_PuPd_UP ;
+	   GPIO_InitStructure.GPIO_Pin =  HW1_PIN;
+	   GPIO_Init(HW1_GPIO_PORT, &GPIO_InitStructure);
+	   GPIO_InitStructure.GPIO_Pin =  HW2_PIN;
+	   GPIO_Init(HW2_GPIO_PORT, &GPIO_InitStructure);
+	   GPIO_InitStructure.GPIO_Pin =  HW3_PIN;
+	   GPIO_Init(HW3_GPIO_PORT, &GPIO_InitStructure);
+
+
+
+
+}
+
+
+
+// ********************************************** //
+// ***               ADCConfig()              *** //
+// ***                                        *** //
+// ***            Configures the ADC          *** //
+// ***                                        *** //
+// ***                                        *** //
+// ********************************************** //
+void ADCConfig(void)
+{
+
+	    GPIO_InitTypeDef 		GPIO_InitStructure;
+	    ADC_InitTypeDef       ADC_InitStructure;
+		ADC_CommonInitTypeDef ADC_CommonInitStructure;
+		DMA_InitTypeDef       DMA_InitStruct;
+		//TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+
+		/* Enable SYSCFG clock */
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+		/* Enable ADC 1 clock */
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);// (| RCC_APB2Periph_ADC2 | RCC_APB2Periph_ADC3)
+		/* Enable DMA2 and GPIO clocks */
+		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2 | RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB |RCC_AHB1Periph_GPIOC, ENABLE);
+
+		/* DMA2 Stream0 channel0 configuration **************************************/
+		DMA_InitStruct.DMA_Channel = DMA_Channel_0;//ADC1: DMA2, Stream0, Channel0
+		DMA_InitStruct.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;//ADC1's data register
+		DMA_InitStruct.DMA_Memory0BaseAddr = (uint32_t)&AdcConversionResult[0];
+		DMA_InitStruct.DMA_DIR = DMA_DIR_PeripheralToMemory;
+		DMA_InitStruct.DMA_BufferSize = NUMBER_OF_CONVERSION_RESULTS;
+		DMA_InitStruct.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+		DMA_InitStruct.DMA_MemoryInc = DMA_MemoryInc_Enable;
+		DMA_InitStruct.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;//Reads 16 bit values
+		DMA_InitStruct.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;//Stores 16 bit values
+		DMA_InitStruct.DMA_Mode = DMA_Mode_Circular;
+		DMA_InitStruct.DMA_Priority = DMA_Priority_Low;
+		DMA_InitStruct.DMA_FIFOMode = DMA_FIFOMode_Disable;
+		DMA_InitStruct.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
+		DMA_InitStruct.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+		DMA_InitStruct.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+		DMA_Init(DMA2_Stream0, &DMA_InitStruct);
+		DMA_Cmd(DMA2_Stream0, ENABLE);
+
+		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+		GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+		GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 |  GPIO_Pin_6;
+		GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+
+
+		/* ADC Common Init **********************************************************/
+		ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
+		ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div8;//168MHz / 8 = 21MHz (allowed: 0.6 ... 36MHz)
+		ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
+		ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
+		ADC_CommonInit(&ADC_CommonInitStructure);
+
+		/* ADC1 Init ****************************************************************/
+		ADC_DeInit();
+		ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+		ADC_InitStructure.ADC_ScanConvMode = ENABLE;//The scan is configured in multiple channels
+		ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;//ENABLE;//Continuous conversion: input signal is sampled more than once
+		ADC_InitStructure.ADC_ExternalTrigConvEdge =  ADC_ExternalTrigConvEdge_None;//ADC_ExternalTrigConvEdge_Falling;//
+		ADC_InitStructure.ADC_ExternalTrigConv = 0;//ADC_ExternalTrigConv_T3_CC1;
+		ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+		ADC_InitStructure.ADC_NbrOfConversion = NUMBER_OF_CONVERSION_RESULTS;//length of sequence
+		ADC_Init(ADC1, &ADC_InitStructure);
+
+
+		//ADC_EOCOnEachRegularChannelCmd(ADC1,ENABLE);
+
+		/* ADC1 regular channel  configuration: Sequence C1 -> Ch2 -> ....*/
+		ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_84Cycles);//ADC_SampleTime_28Cycles
+		ADC_RegularChannelConfig(ADC1, ADC_Channel_6, 2, ADC_SampleTime_84Cycles);
+
+
+		/* Enable DMA request after last transfer (Single-ADC mode) */
+		ADC_DMARequestAfterLastTransferCmd(ADC1, ENABLE);
+
+		memset(AdcConversionResult, 0, sizeof(AdcConversionResult));
+
+		/* Enable ADC1 DMA */
+		ADC_DMACmd(ADC1, ENABLE);
+
+		/* Enable ADC1 */
+		ADC_Cmd(ADC1, ENABLE);
+
+		/* Start ADC1 Software Conversion */
+		ADC_SoftwareStartConv(ADC1);
+
+
+
+
+}
+
+
+// ********************************************** //
+// ***           FanInit()                    *** //
+// ***                                        *** //
+// ***    Configures Fan PWM-Timer and Port   *** //
+// ***                                        *** //
+// ***                                        *** //
+// ********************************************** //
+void FanInit(void)
+{
+
+	  GPIO_InitTypeDef 		      GPIO_InitStructure;
+  	  TIM_TimeBaseInitTypeDef     TIM_TimeBaseStructure;
+  	  TIM_OCInitTypeDef           TIM_OCInitStructure;
+
+  	  uint16_t PrescalerValue;
+
+  	  /* Enable SYSCFG clock */
+  	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+  	  /* GPIO clock enable */
+  	  RCC_AHB1PeriphClockCmd(FAN_GPIO_RCC , ENABLE);
+
+  	  /* TIM9 clock enable */
+  	  EnableTimerPeriphClock(FAN_TIMER);
+
+  	 /* Fan Port GPIO-PWM-Pin to AF*/
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;//GPIO_PuPd_UP ;
+	  GPIO_InitStructure.GPIO_Pin = FAN_GPIO_PIN;
+	  GPIO_Init(FAN_GPIO_PORT, &GPIO_InitStructure);
+
+      /* Connect TIM9 pin E5 to AF */
+ 	  GPIO_PinAFConfig(FAN_GPIO_PORT, FAN_PIN_SOURCE, FAN_TIMER_AF);
+
+ 	   /* PWM TIMER9 */
+ 	  PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 10000) - 1;//10000 -> 10kHz counter frequency
+
+ 	  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+
+ 	  /* Time base configuration */
+ 	  TIM_TimeBaseStructure.TIM_Period = FAN_PWM_PERIODE;//in 100us
+ 	  TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
+ 	  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+ 	  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;//TIM_CounterMode_CenterAligned1;//
+ 	  TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
+
+ 	  TIM_TimeBaseInit(FAN_TIMER, &TIM_TimeBaseStructure);
+
+ 	 TIM_OCStructInit(&TIM_OCInitStructure);
+
+ 	  /* PWM Mode configuration */
+ 	  TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+ 	  TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+ 	  TIM_OCInitStructure.TIM_Pulse = 0;
+ 	  TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+ 	  TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Reset;
+ 	  //Channel 1 -> OC1
+ 	  TIM_OC1Init(FAN_TIMER, &TIM_OCInitStructure);
+
+ 	  TIM_OC1PreloadConfig(FAN_TIMER, TIM_OCPreload_Enable);
+
+ 	  TIM_CtrlPWMOutputs(FAN_TIMER, ENABLE);
+
+ 	  TIM_ARRPreloadConfig(FAN_TIMER, ENABLE);
+
+ 	  /* TIM enable */
+ 	  TIM_Cmd(FAN_TIMER, ENABLE);
+
+ 	 memset(&FanControl, 0, sizeof(FanControl));
+
+ 	FanControl.onpwm = FAN_PWM_PERIODE;
+ 	FanControl.templow = I2cReadEepromInteger(EEPROM_ADDRESS_FAN_TEMP_LOW);
+ 	if(FanControl.templow == 0xFFFFFFFF)
+ 	{
+		FanControl.templow = FAN_DEFAULT_TEMPLOW;// in 1/1000�C
+ 	}
+ 	FanControl.temphigh = I2cReadEepromInteger(EEPROM_ADDRESS_FAN_TEMP_HIGH);
+	if(FanControl.temphigh == 0xFFFFFFFF)
+	{
+		FanControl.temphigh = FAN_DEFAULT_TEMPHIGH;// in 1/1000�C
+	}
+
+
+
+ 	FanControl.regulation = 1;
+
+
+
+}
+
+// ********************************************** //
+// ***           FanSetPwm()                  *** //
+// ***                                        *** //
+// ***        sets PWM of FAN                 *** //
+// ***                                        *** //
+// ***                                        *** //
+// ********************************************** //
+void FanSetPwm(uint16_t pwm)
+{
+
+	    if(pwm > FAN_PWM_PERIODE)
+		{
+			pwm = FAN_PWM_PERIODE;
+		}
+
+	    switch(FAN_TIMER_CHANNEL)
+	    {
+	    	case 1:
+	    		TIM_SetCompare1(FAN_TIMER, pwm);//Channel 1
+	    	break;
+	    	case 2:
+				TIM_SetCompare2(FAN_TIMER, pwm);//Channel 1
+			break;
+	    	case 3:
+				TIM_SetCompare3(FAN_TIMER, pwm);//Channel 1
+			break;
+	    	case 4:
+				TIM_SetCompare4(FAN_TIMER, pwm);//Channel 1
+			break;
+
+	    }
+
+	    //remember this for log data
+	    FanControl.pwm = pwm;
+
+
+
+}
+
+
+
+
+
+
+
+#ifdef  USE_FULL_ASSERT
+
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t* file, uint32_t line)
+{
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+
+  while (1)
+  {}
+}
+#endif
+
+/**
+  * @}
+  */ 
+
+/**
+  * @}
+  */ 
+
+/******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
+// ********************************************** //
+// ***            SystemTimerConfig()         *** //
+// ***     configures Timer 6                 *** //
+// ***     for 20kHz                          *** //
+// ***                                        *** //
+// ********************************************** //
+void SystemTimerConfig(void)
+{
+
+	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	uint16_t Prescalerval;
+
+
+	  /* Timer 1 clock enable*/
+	  EnableTimerPeriphClock(SYSTEM_TIMER);
+
+	  /* Timer config */
+	  Prescalerval = (uint16_t) ((SystemCoreClock /2) / 1000000) - 1;//1000000 -> 1MHz counter frequency
+
+	  if(IsTimerOnAPB2(SYSTEM_TIMER))
+	  {
+		  //timer with double frequency -> double prescaler
+		  Prescalerval = Prescalerval * 2;
+	  }
+
+	  TIM_DeInit(SYSTEM_TIMER);
+	  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+
+	  /* Time base configuration for System Timing*/
+	  TIM_TimeBaseStructure.TIM_Period = 500;//in us ; 500 = 500us
+	  TIM_TimeBaseStructure.TIM_Prescaler = Prescalerval;//
+	  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+	  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	  TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
+	  //System-Timer
+	  TIM_TimeBaseInit(SYSTEM_TIMER, &TIM_TimeBaseStructure);
+
+	  /* TIM8 TRGO selection for ADC-Trigger */
+	  //TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update); // ADC_ExternalTrigConv_T2_TRGO
+
+	  /* Enable the TIM global Interrupt */
+	  NVIC_InitStructure.NVIC_IRQChannel = SYSTEM_TIMER_IRQ_CHANNEL;//TIM6_DAC_IRQn;
+	  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+	  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	  NVIC_Init(&NVIC_InitStructure);
+
+	  /* Enable the Update Interrupt Request */
+	  TIM_ITConfig(SYSTEM_TIMER, TIM_IT_Update, ENABLE);
+
+	  /* Start Timer */
+	  TIM_Cmd(SYSTEM_TIMER, ENABLE);
+
+
+
+
+
+}
+
+
+
+
+// ********************************************** //
+// ***               LedRed()                 *** //
+// ***       switches red  LED                *** //
+// ***       ON - switches Led on             *** //
+// ***       OFF - switches Led off           *** //
+// ***             inc: defines.h             *** //
+// ********************************************** //
+void LedRed(uint8_t state)
+{
+	if(state == ON)
+	{
+		GPIO_SetBits(LED_RED_GPIO_PORT, LED_RED_PIN);
+	}
+	else
+	{
+		GPIO_ResetBits(LED_RED_GPIO_PORT, LED_RED_PIN);
+	}
+
+}
+
+
+// ********************************************** //
+// ***               LedGreen()               *** //
+// ***       switches green  LED              *** //
+// ***       ON - switches Led on             *** //
+// ***       OFF - switches Led off           *** //
+// ***             inc: defines.h             *** //
+// ********************************************** //
+void LedGreen(uint8_t state)
+{
+	if(state == ON)
+	{
+		GPIO_SetBits(LED_GREEN_GPIO_PORT, LED_GREEN_PIN);
+	}
+	else
+	{
+		GPIO_ResetBits(LED_GREEN_GPIO_PORT, LED_GREEN_PIN);
+	}
+
+}
+
+
+
+
+
+
+
+
+
+
+// ***************************************************************************** //
+// ***       Function:    IsWakeupHigh                                       *** //
+// ***       Purpose:  reads WAKEUP pin level                                *** //
+// ***       Input:   none                                                   *** //
+// ***       Return: 1 - high, 0 - low                                       *** //
+// ***************************************************************************** //
+uint8_t IsWakeupHigh(void)
+{
+
+		uint8_t c;
+
+		c = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
+
+		return c;
+
+}
+
+// ***************************************************************************** //
+// ***       Function:    ReadHardwareVersion                                *** //
+// ***       Purpose:  reads Hardware Version according assembled resistors  *** //
+// ***       Input:   none                                                   *** //
+// ***       Return: Hardware-Version (0...7)                                *** //
+// ***************************************************************************** //
+uint8_t ReadHardwareVersion(void)
+{
+
+		uint8_t c;
+
+
+
+		c = GPIO_ReadInputDataBit(HW3_GPIO_PORT, HW3_PIN) << 2;
+		c |= GPIO_ReadInputDataBit(HW2_GPIO_PORT, HW2_PIN) << 1;
+		c |= GPIO_ReadInputDataBit(HW1_GPIO_PORT, HW1_PIN);
+
+		return c;
+
+}
+
+
+// ********************************************** //
+// ***              Decoder()                 *** //
+// ***         Decodes received Data          *** //
+// ***             AST                        *** //
+// ***             Blink AG                   *** //
+// ***             2016-07-28                 *** //
+// ********************************************** //
+void Decoder(char * buf)
+{
+
+	  unsigned char ack = 2;//2: unknown command
+							//1: command with no direct answer
+							//0: answer sent already
+	  //uint16_t uitemp = 0;
+	  //uint16_t itemp = 0;
+	  //uint8_t ucTemp;
+	  //for display text functions
+	  int8_t dir;
+	  int16_t sp, x, y;
+	  int32_t state,st;
+	  uint16_t adr;
+	  uint32_t dat, X, Y;
+	  char strout[RX_BUFFER_SIZE];
+	  int32_t typ, p1, p2, p3, p4, p5, p6;
+	  uint8_t mot, uc, len;
+	  float32_t f;
+	  uint8_t type[10];
+
+
+      memset(strTemp,0,sizeof(strTemp));
+
+      switch(buf[0])
+      {
+      	   case 'A'://Audio
+		   break;
+           case 'B':// Barcode
+           break;
+	       case 'E'://Exposure
+					 X = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//port
+					 Y = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//line
+					 p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//current
+					 p4 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);//periode
+					 p5 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);//pulse
+					 switch(buf[1])
+					 {
+						 case '0'://off
+								 SetExposureModeSychron(X, OFF);
+								 SwitchExposureOff(X);
+								 ack = 1;//send ack
+						 break;
+						 case 'S'://read sensors
+								 ExposureControl[X].readsensors = Y;
+								 ack = 1;//send ack
+						 break;
+						 case 'C'://constant current mode
+							 //if((ExposureControl[0].safetydisabled == 1) || (Drawer.detect == 1))
+							 //{
+								 SetExposureModeSychron(X, OFF);
+								 SwitchExposureOn(X, Y, p3, 1000, 1000);
+								 ack = 1;//send ack
+							 //}
+							 //else
+							 //{
+							//	 ack = 3;// #
+							// }
+						 break;
+						 case 'P'://fixed Pulse Mode
+							    //if((ExposureControl[0].safetydisabled == 1) || (Drawer.detect == 1))
+							 	//{
+									 SetExposureModeSychron(X, OFF);
+									 SwitchExposureOn(X, Y, p3, p4, p5);
+									 ack = 1;//send ack
+							 	//}
+								 //else
+								 //{
+								//	 ack = 3;// #
+								 //}
+						 break;
+						 case 'D'://Delayed synchron with Encoder Mode
+							 //if((ExposureControl[0].safetydisabled == 1) || (Drawer.detect == 1))
+							 //{
+								 SetExposureModeSychron(X, ON);
+								 //per - "delay"
+								 //pul - "Pulse"
+								 SwitchExposureOn(X, Y, p3, (p4 + p5), p4);
+								 ack = 1;//send ack
+							 //}
+							// else
+							 //{
+							//	 ack = 3;// #
+							// }
+						 break;
+						 case 'R'://Set regulated output power
+							 SetExposureModeSychron(X, OFF);
+							 SwitchExposureRegulatedPowerOn(X, Y, p3);//power in uW
+							 ack = 1;//send ack
+						 break;
+						 case 'Q'://Exposure Power Calibration
+							   //X: line
+							   p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//ThorLabs Sensor Data in uW
+							   switch(buf[2])
+							   {
+									 case 'L'://lower current Calibration point
+										 if((ExposureControl[0].currentset > 50) && (ExposureControl[0].currentset <= 200))
+										 {
+											 ExposureCalibrationLow(p2);
+											 ack = 1;//send ack
+										 }
+										 else
+										 {
+											 ack = 2;//send nack
+										 }
+									 break;
+									 case 'H'://lower current Calibration point
+										 if((ExposureControl[0].currentset > 200) && (ExposureControl[0].currentset <= 1000))
+										 {
+											 if(ExposureCalibrationHigh(p2))
+											 {
+												 SendToCommunicationPort("!ExpCalOk", 9);
+												 ack = 0;//send nothing
+											 }
+											 else
+											 {
+												 ack = 2;//send nack
+											 }
+										 }
+										 else
+										 {
+											 ack = 2;//send nack
+										 }
+									 break;
+									 case 'C'://Exposure Current Calibration
+										 ExposureStartCurrentCalibration(X);
+										 ack = 1;//send ack
+									 break;
+									 case 'R'://reset calibration
+										 ExposureCalibrationReset(X);
+										 ack = 1;//send ack
+									 break;
+							   }
+						   break;
+					 }
+		   break;
+		   case 'F'://Fan
+				 X = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//port
+				 switch(buf[1])
+				 {
+					 case 'P'://PWM
+						     FanSetPwm(X);
+							 ack = 1;//send ack
+					 break;
+					 case 'R'://Regulation
+							 FanControl.regulation = X;
+							 ack = 1;//send ack
+					 break;
+					 case 'L'://low temperature
+						     FanControl.templow = X;
+						     I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_FAN_TEMP_LOW, X, 0);
+							 ack = 1;//send ack
+					 break;
+					 case 'H'://high temperature
+							 FanControl.temphigh = X;
+							 I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_FAN_TEMP_HIGH, X, 0);
+							 ack = 1;//send ack
+					 break;
+				 }
+		   break;
+		   case 'D'://DC-Motor-Functions
+				//not present
+		   break;
+		   case 'N'://encoder speed observation
+		   break;
+		   case 'K'://Calibration
+			   switch(buf[1])
+				 {
+					 case 'I'://Inclinometer
+						 //not present
+					 break;
+				 }
+		   break;
+		   case 'M'://EEPROM-Memory Write
+				 adr = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//address
+				 dat = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//data
+				 switch(buf[1])
+				 {
+					 case 'B'://byte
+							 I2cWriteEepromByte(adr, (uint8_t)dat);
+							 ack = 1;//send ack
+					 break;
+					 case 'I'://integer (32bit)
+							 I2cWriteEepromInteger(adr, dat);
+							 ack = 1;//send ack
+					 break;
+				 }
+		   break;
+		   case 'm'://EEPROM-Ext Memory Write
+					 adr = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//address
+					 dat = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//data
+					 switch(buf[1])
+					 {
+						 case 'B'://byte
+								 I2cWriteEepromExtByte(adr, (uint8_t)dat);
+								 ack = 1;//send ack
+						 break;
+						 case 'I'://integer (32bit)
+								 I2cWriteEepromExtInteger(adr, dat);
+								 ack = 1;//send ack
+						 break;
+					 }
+		   break;
+		   case 'C'://send can message
+				  X = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//ID
+				  Y = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//Command
+				  dat = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//Parameter
+				   CanSend(X, Y, dat, 0);
+				   ack = 1;//send ack
+		   break;
+		   case 'c'://send special CAN Command: c
+					X = 0;
+					//find out the CAN ADDRESS of the destination from the letter
+					for(Y = 0 ; Y < NUMBER_OF_CAN_IDS ; Y++)
+					{
+						if(CanAscii[Y] == buf[1])
+						{
+							X = Y;
+						}
+					}
+					//add the source Address to build the CAN-ID
+					X = (MyCanId << 5) | X;
+					//command type
+					switch(buf[2])
+					{
+						case 'L'://LED
+							if(buf[4] == '1')//state
+							{
+								   state = ON;
+							}
+							else
+							{
+								   state = OFF;
+							}
+							switch(buf[3])//LED color
+							{
+							   case 'r'://red
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LED_DEBUG_RED, state, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'g'://green
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LED_DEBUG_GREEN, state, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'y'://yellow
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LED_DEBUG_YELLOW, state, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'b'://blue
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LED_DEBUG_BLUE, state, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   /* LightController */
+							   case 'P'://Panel Color and Brightness
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   switch(buf[4])//Panel
+								   {
+									   case 'C'://color
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_PANEL_SET_COLOR, p1, 0, 1);
+										   ack = 1;//send ack
+									   break;
+									   case 'B'://intensity
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_PANEL_SET_BRIGHTNESS, p1, 0, 1);
+										   ack = 1;//send ack
+									   break;
+								   }
+							   break;
+							   case 'F'://set Fade
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_FADE, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'R'://start Animation
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_START_RANDOM, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'Z'://start Script
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_START_SCRIPT, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'z'://stop Script
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_STOP_SCRIPT, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'M'://save Panel data
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SAVE_PANEL_TO_EEPROM, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'm'://retrieve Panel data
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_OPEN_PANEL_FROM_EEPROM, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'c'://erase Panel data
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_RESET_MEMORY, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'S'://start Animation
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_START_ANIMATION, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'B'://start Battery Animation
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_START_BATTERY_ANIMATION, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'H'://start Charge Animation
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_START_CHARGE_ANIMATION, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case '-'://stop Animation
+								   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_STOP_ANIMATION, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'L'://Line
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+								   switch(buf[4])//
+								   {
+									   case 'C'://color
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_LINE_COLOR, p1, 0, 1);
+										   ack = 1;//send ack
+									   break;
+									   case 'I'://intensity
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_LINE_INTENSITY, p1, 0, 1);
+										   ack = 1;//send ack
+									   break;
+								   }
+							   break;
+							   case 'C'://Column
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+								   switch(buf[4])//
+								   {
+									   case 'C'://color
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_COLUMN_COLOR, p1, 0, 1);
+										   ack = 1;//send ack
+									   break;
+									   case 'I'://intensity
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_COLUMN_INTENSITY, p1, 0, 1);
+										   ack = 1;//send ack
+									   break;
+								   }
+							   break;
+							   case 'X'://Pixel
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								   p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+								   p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);
+								   switch(buf[4])//
+								   {
+									   case 'C'://color
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_PIXEL_COORDINATES, ((p1 << 8) | p2), 0, 1);
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_PIXEL_COLOR, p3, 0, 1);
+										   ack = 1;//send ack
+									   break;
+									   case 'I'://intensity
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_PIXEL_COORDINATES, ((p1 << 8) | p2), 0, 1);
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIGHT_SET_PIXEL_INTENSITY, p3, 0, 1);
+										   ack = 1;//send ack
+									   break;
+								   }
+							   break;
+							}
+						break;
+						case 'S'://Stepmotor-Functions CAN
+						{
+							mot = 0;
+							 switch(buf[3])//stepper axis
+							 {
+							   case 'X'://Stepmotor-X-Functions
+								   mot = 0;//to identify the axis dependent CAN commands
+							   break;
+							   case 'Y'://Stepmotor-Y-Functions
+								   mot = 1;//to identify the axis dependent CAN commands
+							   break;
+							   case 'Z'://Stepmotor-Z-Functions
+								   mot = 2;//to identify the axis dependent CAN commands
+							   break;
+							   case 'E'://Stepmotor-E-Functions
+								   mot = 3;//to identify the axis dependent CAN commands
+							   break;
+							 }
+							 switch(buf[4])//stepper commands
+							 {
+								   case 'S'://drive steps
+									   dir = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   sp = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//speed
+									   st = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//steps
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].setspeed, sp, 0, 0);
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].drivesteps, (st * dir), 0, 1);//fw: positive; rw: negative
+									   ack = 1;//send ack
+								   break;
+								   case 'V'://set speed
+									   sp = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].setspeed, sp, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'A'://set acceleration
+									   sp = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//acc
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].setacceleration, sp, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'D'://set acceleration
+									   sp = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//dec
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].setdeceleration, sp, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'M'://set microstep configuration
+									   sp = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].setmsconfig, sp, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'P'://goto Position
+									   st = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].gotoposition, st, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'E'://goto Encoder Position
+									   st = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].gotoencoder, st, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'F'://goto Encoder Position while watching for Force limit
+									   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//force
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].gotoencoderwatchforce, p1, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'T'://goto Liquid Touch detection or to Encoder Position
+									   st = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].gotoencoderliquid, st, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'R'://Reference Drive
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].referencedrive, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case '-'://Stop
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].stop, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'r'://request state
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].requeststate, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'p'://request Position
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].requestposition, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'e'://request Encoder Position
+									   CanAppendMessageToTxQueue(X, StepmotorCanCommand[mot].requestencoder, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'I'://go to Injector reference position
+									   if(mot == 0)//MOTOR_X
+									   {
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_MOTOR_X_GOTO_INJECTOR_REFERENCE, 0, 0, 1);
+										   ack = 1;//send ack
+									   }
+								   break;
+								   case 'J'://go to Injector reference position
+									   if(mot == 0)//MOTOR_X
+									   {
+										   CanAppendMessageToTxQueue(X, CAN_COMMAND_MOTOR_X_GOTO_INJECTOR_DOCKPOS, 0, 0, 1);
+										   ack = 1;//send ack
+									   }
+								   break;
+								   case 'i'://request reference position
+									   CanAppendMessageToTxQueue(X, CAN_COMMAND_MOTOR_X_REQUEST_INJECTOR_REFERENCE, 0, 0, 0);
+									   ack = 1;//send ack
+								   break;
+								   case 'j'://request reference position
+									   CanAppendMessageToTxQueue(X, CAN_COMMAND_MOTOR_X_REQUEST_INJECTOR_DOCKPOS, 0, 0, 0);
+									   ack = 1;//send ack
+								   break;
+								   case 'u'://request backlash
+									   CanAppendMessageToTxQueue(X, CAN_COMMAND_INJECTOR_REQUEST_BACKLASH, 0, 0, 0);
+									   ack = 1;//send ack
+								   break;
+								   case 's'://request reference position
+									   switch(buf[5])
+									   {
+										   case 'I'://set reference position
+											   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+											   CanAppendMessageToTxQueue(X, CAN_COMMAND_MOTOR_X_SET_INJECTOR_REFERENCE, p1, 0, 1);
+											   ack = 1;//send ack
+										   break;
+										   case 'J'://set docking position
+											   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+											   CanAppendMessageToTxQueue(X, CAN_COMMAND_MOTOR_X_SET_INJECTOR_DOCKPOS, p1, 0, 1);
+											   ack = 1;//send ack
+										   break;
+										   case 'U'://set backlash
+											   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+											   CanAppendMessageToTxQueue(X, CAN_COMMAND_INJECTOR_SET_BACKLASH, p1, 0, 1);
+											   ack = 1;//send ack
+										   break;
+									   }
+								   break;
+							  }//stepper commands
+					 }//Stepmotor
+					break;
+						case 'D'://DC-Motor-Functions
+						{
+							mot = 0;
+							 switch(buf[3])//stepper axis
+							 {
+							   case '1'://DC-Motor 1 - Functions
+								   mot = 0;//to identify the axis dependent CAN commands
+							   break;
+							   case '2'://DC-Motor 2 - Functions
+								   mot = 1;//to identify the axis dependent CAN commands
+							   break;
+							   case '3'://DC-Motor 3 - Functions
+								   mot = 2;//to identify the axis dependent CAN commands
+							   break;
+							   case '4'://DC-Motor 3 - Functions
+								   mot = 3;//to identify the axis dependent CAN commands
+							   break;
+							 }
+							 switch(buf[4])//DC-Motor commands
+							 {
+								   case 'V'://set speed
+									   sp = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].setspeed, sp, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'E'://goto Encoder Position
+									   st = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].gotoencoder, st, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'R'://Reference Drive
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].referencedrive, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case '-'://Stop
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].stop, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'r'://request state
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].requeststate, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'e'://request Encoder Position
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].requestencoder, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'v'://request actual speed //formerly 's' AST 2020-05-09
+									   CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].requestspeed, 0, 0, 1);
+									   ack = 1;//send ack
+								   break;
+								   case 'C'://CartridgePositioning
+									    p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//Pos
+									    p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//Mode
+									    p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//PWM
+									    CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].gotocartpos, (p2 << 24) | ((p1 & 0xFF) << 16) | (p3 & 0xFFFF), 0, 1);
+										ack = 1;//send ack
+									break;
+								   case 'H'://LiftPosition
+									    p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//PWM
+									    CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].gotolbhigh, p1, 0, 1);
+										ack = 1;//send ack
+									break;
+									case 'L'://LiftPosition
+										p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//PWM
+										CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].gotolblow, p1, 0, 1);
+										ack = 1;//send ack
+									break;
+									case 'T'://set time in 1/10s (for mixer)
+										p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//time
+									    p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//dir
+									    CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].starttime, (p2 << 24) | (p1 & 0xFFFFFF), 0, 1);
+										ack = 1;//send ack
+									break;
+									case 'c'://close (for PCR-Chamber)
+										p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//PWM
+										CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].close, p1, 0, 1);
+										ack = 1;//send ack
+									break;
+									case 'o'://close (for PCR-Chamber)
+										p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//PWM
+										CanAppendMessageToTxQueue(X, DcMotorCanCommand[mot].open, p1, 0, 1);
+										ack = 1;//send ack
+									break;
+									case 'D'://down position (for Lift)
+										if(mot == 1)//only for Lift
+										{
+											CanAppendMessageToTxQueue(X, CAN_COMMAND_LIFT_GOTO_DOWN_POSITION, 0, 0, 1);
+											ack = 1;//send ack
+										}
+									break;
+									case 'd'://request lift down position
+										if(mot == 1)//only for Lift
+										{
+											CanAppendMessageToTxQueue(X, CAN_COMMAND_LIFT_REQUEST_DOWN_POSITION, 0, 0, 0);
+											ack = 1;//send ack
+										}
+								   break;
+									case 'B'://Barcode position (for Lift)
+										if(mot == 1)//only for Lift
+										{
+											CanAppendMessageToTxQueue(X, CAN_COMMAND_LIFT_GOTO_BARCODE_POSITION, 0, 0, 1);
+											ack = 1;//send ack
+										}
+									break;
+									case 'b'://request lift Barcode position
+										if(mot == 1)//only for Lift
+										{
+											CanAppendMessageToTxQueue(X, CAN_COMMAND_LIFT_REQUEST_BARCODE_POSITION, 0, 0, 0);
+											ack = 1;//send ack
+										}
+								   break;
+								   case 's'://set position
+									   switch(buf[5])
+									   {
+										   case 'D'://set reference position
+											   if(mot == 1)//only for Lift
+											   {
+												   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+												   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIFT_SET_DOWN_POSITION, p1, 0, 1);
+												   ack = 1;//send ack
+											   	}
+										   break;
+										   case 'B'://set reference position
+											   if(mot == 1)//only for Lift
+											   {
+												   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+												   CanAppendMessageToTxQueue(X, CAN_COMMAND_LIFT_SET_BARCODE_POSITION, p1, 0, 1);
+												   ack = 1;//send ack
+												}
+										   break;
+									   }
+								   break;
+							  }//DC-Motor commands
+					 }//DC-Motor
+					break;
+					case 'J':// Movement permit
+						switch(buf[3])//
+						{
+						   case 'O'://Joker for movement permit
+							   CanAppendMessageToTxQueue(X, CAN_COMMAND_ADD_MOVEMENT_PERMIT_JOKER, 0, 0, 1);
+						   break;
+						}
+				    break;
+					case 'R'://Servomotor-Functions
+					{
+						mot = 0;
+						 switch(buf[3])//servo axis
+						 {
+						   case '1'://Servomotor 1 - Functions
+							   mot = 0;//to identify the axis dependent CAN commands
+						   break;
+						   case '2'://Servomotor 2 - Functions
+							   mot = 1;//to identify the axis dependent CAN commands
+						   break;
+						   case '3'://Servomotor 3 - Functions
+							   mot = 2;//to identify the axis dependent CAN commands
+						   break;
+						   default:
+							   break;//exit from outer switch
+						 }
+						 switch(buf[4])//Servomotor commands
+						 {
+							   case 'P'://set position
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//position
+								   CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].setpos, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'V'://set speed
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//speed
+								   CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].setspeed, p1, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'F'://reset fuse
+								   CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].resetfuse, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'I'://Position IN
+								   CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].movein, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'O'://Position OUT
+								   CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].moveout, 0, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case 'M'://Memory: position
+								    p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//position
+									switch(buf[5])
+									{
+										 case 'I'://Position IN
+											CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].calibratepositionin, p1, 0, 0);
+											ack = 1;//send ack
+										  break;
+										 case 'O'://Position OUT
+											 CanAppendMessageToTxQueue(X, ServomotorCanCommand[mot].calibratepositionout, p1, 0, 0);
+											ack = 1;//send ack
+										 break;
+									}
+
+							break;
+						 }
+					}
+					break;
+					case 'E'://Exposure
+						p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//port or line/current/periode
+						p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//line or pulse
+						p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//current
+						p4 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);//periode
+						p5 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);//pulse
+						dat = (p1 << 16 ) | p2;//combined periode and pulse
+						mot = 0;//Channel Number
+						 switch(buf[3])//exposure channel
+						 {
+						 	   //single commands
+							   case 'A'://Exposure Channel A - Functions
+								   mot = 0;//to identify the axis dependent CAN commands
+							   break;
+							   case 'B'://Exposure Channel B - Functions
+								   mot = 1;//to identify the axis dependent CAN commands
+							   break;
+							   //composite commands:
+							   case 'C'://Exposure Constant-Current Mode
+								   mot = 255;//to identify the axis dependent CAN commands
+								   if((p1 < 0) || (p1 > 1))
+								   {
+									  break;
+								   }
+								   CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setcurrent, p3, 0, 0);
+								   CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setline, p2 + 1, 0, 1);
+								   //dat = (p4 << 16 ) | p5;//combined periode and pulse
+								   //CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setpulse, dat, 0, 0);
+								   ack = 1;//send ack
+							   break;
+							   case 'P'://Pulse Mode
+								   mot = 255;//to identify the axis dependent CAN commands
+								   if((p1 < 0) || (p1 > 1))
+								   {
+									  break;
+								   }
+								   CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setcurrent, p3, 0, 0);
+								   CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setline, p2 + 1, 0, 0);
+								   dat = (p4 << 16 ) | p5;//combined periode and pulse
+								   CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setpulse, dat, 0, 1);
+								   ack = 1;//send ack
+							   break;
+							   case '0'://Exposure off
+								   mot = 255;//to identify the axis dependent CAN commands
+								   if((p1 < 0) || (p1 > 1))
+								   {
+									  break;
+								   }
+								   CanAppendMessageToTxQueue(X, ExposureCanCommand[p1].setline, 5, 0, 1);
+								   ack = 1;//send ack
+							   break;
+						 }
+						 if(mot > 1)// all messages are already sent
+						 {
+							 break;
+						 }
+						 switch(buf[4])//single commands
+						 {
+							 case 'L'://set Linie
+									 CanAppendMessageToTxQueue(X, ExposureCanCommand[mot].setline, p1, 0, 1);
+									 ack = 1;//send ack
+							 break;
+							 case 'C'://set current
+									 CanAppendMessageToTxQueue(X, ExposureCanCommand[mot].setcurrent, p1, 0, 1);
+									 ack = 1;//send ack
+							 break;
+							 case 'P'://set Pulse
+								 	 dat = (p1 << 16 ) | p2;//combined periode and pulse
+									 CanAppendMessageToTxQueue(X, ExposureCanCommand[mot].setpulse, dat, 0, 1);
+									 ack = 1;//send ack
+							 break;
+						 }
+				   break;
+				   case 'G'://Blood-Sensor
+						switch(buf[3])
+						{
+							case '0'://off
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_BLOODSENSOR_STOP, 0, 0, 1);
+								ack = 1;//send ack
+							break;
+							case '1'://on
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_BLOODSENSOR_START, 0, 0, 1);
+								ack = 1;//send ack
+							break;
+						}
+				   break;
+				   case 'H'://Lysis-Heater
+						p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//port
+						p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//channel, time, temperature
+						if(p1 >= MAX_LYSIS_PORTS)
+						{
+							break;//send nack
+						}
+						switch(buf[3])
+						{
+							case 'T'://set temperature
+								CanAppendMessageToTxQueue(X, LysisCanCommand[p1].setTemperature, p2, 0, 1);
+								ack = 1;//send ack
+							break;
+							case 't'://set time
+								CanAppendMessageToTxQueue(X, LysisCanCommand[p1].setTime, p2, 0, 1);
+								ack = 1;//send ack
+							break;
+							case 'S'://start lysis
+								CanAppendMessageToTxQueue(X, LysisCanCommand[p1].start, p2, 0, 1);
+								ack = 1;//send ack
+							break;
+							case '-'://stop lysis
+								CanAppendMessageToTxQueue(X, LysisCanCommand[p1].stop, 0, 0, 1);
+								ack = 1;//send ack
+							break;
+						}
+				  break;
+				  case 'h'://Hardware Request
+					  p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//number
+					   switch(buf[3])
+					   {
+						   case 'D'://Device-ID
+							   CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_DEVICE_ID, 0, 0, 0);
+							   ack = 1;//send ack
+						   break;
+						   case 'S'://Serial Number
+							   CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_SERIAL_NUMBER, 0, 0, 0);
+							   ack = 1;//send ack
+						   break;
+						   case 'W'://Type/Serial/Hardware
+							   switch(buf[4])
+							   {
+								   case 'T'://Type
+									   CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_DRAWER_TYP, 0, 0, 0);
+									   ack = 1;//send ack
+								   break;
+								   case 'S'://SerialNumber
+									   CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_DRAWER_SN, 0, 0, 0);
+									   ack = 1;//send ack
+								   break;
+								   case 'P'://hardware options
+									   CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_HARDWARE_OPTIONS, 0, 0, 0);
+									   ack = 1;//send ack
+								   break;
+							   }
+						   break;
+					   }
+				  break;
+				  case 'I'://XY-Table
+						 switch(buf[3])
+						 {
+							  case 'P'://Set Position
+								   x = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//periode
+								   y = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//pulse
+								  dat = (x << 16) | y;
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_XY_TABLE_SET_POSITION, dat, 0, 1);
+								  ack = 1;//send ack
+							  break;
+							  case 'R'://Reference Drive
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_XY_TABLE_DO_REFERENCE_DRIVE, 0, 0, 1);
+								  ack = 1;//send ack
+							  break;
+							  case '-'://Stop
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_XY_TABLE_STOP, 0, 0, 1);
+								  ack = 1;//send ack
+							  break;
+						 }
+				  break;
+				  case 'T'://Therm-Functions
+						switch(buf[3])
+						{
+						   case 'E'://enable Bridge and ADC1247
+							   X = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//enable
+							   ack = 1;//send ack
+						   break;
+						   case 'R'://Regulation on/off
+							   X = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//enable
+							   ack = 1;//send ack
+						   break;
+						   case 's'://Sollwert der Temperatur und PID-Werte
+							   st = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//temperatur
+							   //ThermControl.solltemperature = st;
+							   st = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//Reglerparameter P
+							   //ThermControl.P = st;
+							   st = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//temperatur
+							   //ThermControl.I = st;
+							   st = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);//temperatur
+							   //ThermControl.D = st;
+							   //ThermControl.esum = 0;//reset the error sum for I-Term
+							   ack = 1;//send ack
+						   break;
+						   case 'z'://Sollwert der Temperatur (nicht im EEPROM speichern)
+							   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//temperatur
+							   CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_TEMPERATURE, p1, 0, 1);
+							   ack = 1;//send ack;
+							break;
+						   case 'M'://write model and parameters to therm via CAN
+							   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//model number
+							   if(p1 > 0)
+							   {
+								     p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+								     CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_TEMP_TOLERANCE, p2, 0, 1);
+								     p2 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);
+									 CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_OVERSTOOT, p2, 0, 1);
+									 p2 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);
+									 CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_UNDERSHOOT, p2, 0, 1);
+									 p2 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);
+									 CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_BALANCE_TIME, p2, 0, 1);
+									 p2 = GetParameter(strout, buf, 6, RX_BUFFER_SIZE);
+									 CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_COMP_RELEASE, p2, 0, 1);
+								}
+							   CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SET_REGULATION_MODEL, p1, 0, 1);
+							   ack = 1;//send ack
+							break;
+						    case 'm'://Request Model number
+							    CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_REQUEST_REGULATION_MODEL, 0, 0, 0);
+							    ack = 1;//send ack
+						    break;
+							case 'N'://write new model to Therm RAM via CAN
+								p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_WRITE_RAM_MODEL_DATA, p2, p1, 1);
+								ack = 1;//send ack
+							break;
+							case 'K'://write calibration parameter data to Therm EEPROM via CAN
+								p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+								p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_WRITE_CALIBRATION_DATA, p2, p1, 1);
+								ack = 1;//send ack
+							break;
+						}
+				  break;
+				  case 'r'://reset
+					  switch(buf[3])
+					  {
+					  	  case 'T'://reset Timestamp
+					  		CanAppendMessageToTxQueue(X, CAN_COMMAND_RESET_SYSTEM_TIME, 0, 0, 1);
+					  		ack = 1;//send ack
+						  break;
+					  }
+				  break;
+				  case 'U'://Optic Filter changer
+						mot = buf[3] - '1';
+						if(mot != 0)//only one filter motor so far
+						{
+							ack = 2;//send nack
+							break;
+						}
+						p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//position
+						switch(buf[4])
+						{
+							case 'R'://Reference Drive
+							   CanAppendMessageToTxQueue(X, StepmotorCanCommand[0].referencedrive, 0, 0, 1);
+							   ack = 1;//send ack
+						   break;
+						   case 'P'://Position
+							   CanAppendMessageToTxQueue(X, StepmotorCanCommand[0].gotoencoder, p1, 0, 1);
+							   ack = 1;//send ack
+						   break;
+						   case 'F'://Filter Position
+							   CanAppendMessageToTxQueue(X, CAN_COMMAND_FILTER_SET_POSITION, p1, 0, 1);
+							   ack = 1;//send ack
+						   break;
+						   case 'S'://Set Calibration
+							   switch(buf[5])
+							   {
+							   	   case '1':
+							   		   CanAppendMessageToTxQueue(X, CAN_COMMAND_FILTER_1_SET_CALIBRATION, p1, 0, 1);
+							   			ack = 1;//send ack
+								   break;
+							   	   case '2':
+							   		   CanAppendMessageToTxQueue(X, CAN_COMMAND_FILTER_2_SET_CALIBRATION, p1, 0, 1);
+									   ack = 1;//send ack
+								   break;
+							   	   case '3':
+							   		   CanAppendMessageToTxQueue(X, CAN_COMMAND_FILTER_3_SET_CALIBRATION, p1, 0, 1);
+									   ack = 1;//send ack
+								   break;
+							   	   case '4':
+							   		   CanAppendMessageToTxQueue(X, CAN_COMMAND_FILTER_4_SET_CALIBRATION, p1, 0, 1);
+									   ack = 1;//send ack
+								   break;
+							   }
+						   break;
+						   case 'V'://velocity
+							   //not yet implemented
+							   //ack = 1;//send ack
+						   break;
+						}
+				  break;
+				  case 'W'://Weighcell
+					    p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//value
+						switch(buf[3])
+						{
+							case '2'://on
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_WEIGHCELL_RESET, 0, 0, 1);
+								ack = 1;//send ack
+							break;
+							case '1'://on
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_WEIGHCELL_START, 0, 0, 1);
+								ack = 1;//send ack
+							break;
+							case '0'://off
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_WEIGHCELL_STOP, 0, 0, 1);
+								ack = 1;//send ack
+							break;
+							case 'F'://Force Limit value
+								CanAppendMessageToTxQueue(X, CAN_COMMAND_WEIGHCELL_SET_FORCE_LIMIT, p1, 0, 1);
+								ack = 1;//send ack
+							break;
+							case 'C'://Force Calibration value
+								switch(buf[4])
+								{
+									case 'W'://withdraw
+										CanAppendMessageToTxQueue(X, CAN_COMMAND_WEIGHCELL_SET_FORCE_CALIB_W, p1, 0, 1);
+										ack = 1;//send ack
+									break;
+									case 'I'://infuse
+										CanAppendMessageToTxQueue(X, CAN_COMMAND_WEIGHCELL_SET_FORCE_CALIB_I, p1, 0, 1);
+										ack = 1;//send ack
+									break;
+								}
+							break;
+						}
+				   break;
+						case 'M'://EEPROM function via CAN - used for Therm PCR-Flunder-Parameters
+							p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//address
+							p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//data
+							switch(buf[3])
+							{
+								case 'B'://write Byte
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_WRITE_EEPROM_BYTE, p2, p1, 1);
+									ack = 1;//send ack
+								break;
+								case 'b'://read Byte
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_READ_EEPROM_BYTE, 0, p1, 0);
+									ack = 1;//send ack
+								break;
+								case 'I'://write Integer
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_WRITE_EEPROM_INTEGER, p2, p1, 1);
+									ack = 1;//send ack
+								break;
+								case 'i'://read Integer
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_READ_EEPROM_INTEGER, 0, p1, 0);
+									ack = 1;//send ack
+								break;
+							}
+					   break;
+				  case 'z'://Script commands
+						switch(buf[3])
+						{
+							case 'A'://add Script entry
+									typ = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+									p1 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+									p2 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);
+									p3 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);
+									p4 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);
+									p5 = GetParameter(strout, buf, 6, RX_BUFFER_SIZE);
+									p6 = GetParameter(strout, buf, 7, RX_BUFFER_SIZE);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_ADD_ENTRY, typ, 0, 0);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_EDIT_PAR_1, p1, 0, 0);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_EDIT_PAR_2, p2, 0, 0);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_EDIT_PAR_3, p3, 0, 0);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_EDIT_PAR_4, p4, 0, 0);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_EDIT_PAR_5, p5, 0, 1);
+									CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_EDIT_PAR_6, p6, 0, 1);
+									ack = 1;//send ack
+							 break;
+							case 'C'://Clear Script table
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_CLEAR, 0, 0, 1);
+								  ack = 1;//send ack
+							 break;
+							case 'D'://Demo Script
+								  memset(Script, 0, sizeof(Script));
+								  memset(&ScriptControl, 0, sizeof(ScriptControl));
+								  if(GetParameter(strout, buf, 4, RX_BUFFER_SIZE) > 0)
+								  {
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_TEMP_1, GetParameter(strout, buf, 1, RX_BUFFER_SIZE), 0, 0);
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_TEMP_2, GetParameter(strout, buf, 2, RX_BUFFER_SIZE), 0, 0);
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_TEMP_3, GetParameter(strout, buf, 3, RX_BUFFER_SIZE), 0, 0);
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_LOOP, GetParameter(strout, buf, 4, RX_BUFFER_SIZE), 0, 0);
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_TIME_1, GetParameter(strout, buf, 5, RX_BUFFER_SIZE), 0, 0);
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_TIME_2, GetParameter(strout, buf, 6, RX_BUFFER_SIZE), 0, 0);
+									  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_SET_TIME_3, GetParameter(strout, buf, 7, RX_BUFFER_SIZE), 0, 0);
+								  }
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_START, 0, 0, 1);
+								  ack = 1;//send ack
+							 break;
+							case 'p'://Stop Script Execution and set Therm Regulation and PWM off
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_THERM_SCRIPT_STOP, 0, 0, 1);
+								  ack = 1;//send ack
+							 break;
+							case 'S'://Start Script Execution
+								  CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_START, 0, 0, 1);
+								  ack = 1;//send ack
+							 break;
+							 case 'P'://Stop Script Execution
+								 CanAppendMessageToTxQueue(X, CAN_COMMAND_SCRIPT_STOP, 0, 0, 1);
+								 ack = 1;//send ack
+							 break;
+						}
+				break;
+				case 'd'://Firmware Date
+					CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_FIRMWARE_DATE, 0, 0, 0);
+					ack = 1;//send ack
+				break;
+				case'v'://Firmware Version
+					CanAppendMessageToTxQueue(X, CAN_COMMAND_REQUEST_FIRMWARE_VERSION, 0, 0, 0);
+					ack = 1;//send ack
+				break;
+				}//can command type
+		   break;
+           case 'z'://Script commands
+				switch(buf[1])
+				{
+					 case 'A'://add Script entry
+						 if(ScriptControl.entries < (MAX_SCRIPT_ENTRIES - 1))
+						 {
+							 Script[ScriptControl.entries].typ = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);
+							 Script[ScriptControl.entries].par1 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);
+							 Script[ScriptControl.entries].par2 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);
+							 Script[ScriptControl.entries].par3 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);
+							 Script[ScriptControl.entries].par4 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);
+							 Script[ScriptControl.entries].par5 = GetParameter(strout, buf, 6, RX_BUFFER_SIZE);
+							 Script[ScriptControl.entries].par6 = GetParameter(strout, buf, 7, RX_BUFFER_SIZE);
+							 ScriptControl.entries++;
+						 }
+						  ack = 1;//send ack
+					 break;
+					 case 'C'://clear Script table
+						  memset(Script, 0, sizeof(Script));
+						  memset(&ScriptControl, 0, sizeof(ScriptControl));
+						  ack = 1;//send ack
+					 break;
+					 case 'D'://Demo Script
+					 break;
+					 case 'd'://Demo Script Stepper motors
+						  memset(Script, 0, sizeof(Script));
+						  memset(&ScriptControl, 0, sizeof(ScriptControl));
+						  LoadDemoScript(1);
+						  ack = 1;//send ack
+					 break;
+					 case 'e'://Demo Script Can-Stepper motors
+						  memset(Script, 0, sizeof(Script));
+						  memset(&ScriptControl, 0, sizeof(ScriptControl));
+						  LoadDemoScript(2);
+						  ack = 1;//send ack
+					 break;
+					 case 'S'://Start Script Execution
+						  ScriptControl.index = -1;
+						  ScriptControl.remainingtime = 1;
+						  ScriptControl.running = 1;
+						  ack = 1;//send ack
+					 break;
+					 case 'P'://Stop Script Execution
+						  ScriptControl.index = -1;
+						  ScriptControl.remainingtime = 1;
+						  ScriptControl.running = 0;
+						  ack = 1;//send ack
+					 break;
+					 case 'p'://Stop Script Execution and set Therm Regulation and PWM off
+						  ScriptControl.index = -1;
+						  ScriptControl.remainingtime = 1;
+						  ScriptControl.running = 0;
+						  //regulation and PWM off
+						  //forward it to PCR-Module via UART
+						  //PcrUartSend(buf, strlen(buf));
+						  ack = 1;//send ack
+					 break;
+				}
+			break;
+			case 'H'://Lysis-Heater
+			break;
+            case 'L'://Front-LEDs on/off
+                  switch(buf[1])
+                  {
+                       case 'R'://red
+                            LedRed(buf[2] - '0');
+                            ack = 1;//send ack
+                       break;
+                       case 'G'://Green
+                    	   LedGreen(buf[2] - '0');
+                    	   ack = 1;//send ack
+                       break;
+                   }
+                  /* log-Options */
+				 if((buf[1] >= '0') && (buf[1] <= '9'))
+				 {
+					 LogActive = atoi(&buf[1]);
+				   //LogActive = buf[1] - '0';
+				   ack = 1;//send ack
+				 }
+            break;
+		    case 'P':
+			    //send string to UART of ePaper-Display
+			    //UartDisplaySend(buf, strlen(buf));
+		    break;
+		    case 'p':
+		    	switch(buf[1])
+		    	{
+				   case 'M'://Motor voltage supply (24P)
+				   break;
+				   case '1'://Fan und Display Supply	(12P)
+				   break;
+				   case '3'://LED-Ring Supply (4P)
+				   break;
+				   case '5'://Servo und CAN Supply (5P)
+				   break;
+				   case '6'://PC Supply (5P_PC)
+				   break;
+				   case 'D'://DisplayBacklight
+				   break;
+				   case 'B'://PC-Button "ShutDown"
+				   break;
+				   case 'K'://set battery charge value
+				   break;
+		    	}
+			break;
+			case 'S'://Stepmotor-Functions Local
+					p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//direction, speed, position
+					p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//speed
+					p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//steps
+					mot = buf[1] - 'X';
+					if(mot >= NUMBER_OF_STEPMOTORS)
+					{
+						ack = 2;//send nack
+						break;
+					}
+					switch(buf[2])
+					{
+						case 'R'://Reference Drive
+							//if((ExposureControl[0].safetydisabled == 1) || (Drawer.detect == 1))
+							//{
+								StepmotorReferenceDrive(mot);
+								ack = 1;//send ack
+							//}
+							//else
+							//{
+							//	ack = 3;//send nack
+							//}
+						break;
+						case 'S'://drive steps
+							StepmotorStart(mot, p2, p3, p1);
+							ack = 1;//send ack
+						break;
+						case 'V'://set speed
+							StepmotorSetSpeed(mot, p1);
+							/* keep the speed for after the reference drive has finished */
+							StepmotorHW[mot].defaultspeed = p1;
+							ack = 1;//send ack
+						break;
+						case 'A'://set acceleration
+							StepmotorSetAcceleration(mot, p1);
+							ack = 1;//send ack
+						break;
+						case 'D'://set deceleration
+							StepmotorSetDeceleration(mot, p1);
+							ack = 1;//send ack
+						break;
+						case 'L'://Go To Lock Position
+							StepmotorGoToLockPosition(mot);
+							ack = 1;//send ack
+						break;
+						case 'M'://Microstep-configuration
+							StepmotorSetMicrostepConfig(mot, p1);
+							ack = 1;//send ack
+						break;
+						case 'P'://Positioning
+								StepmotorGoToPosition(mot, p1);
+								ack = 1;//send ack
+						break;
+						case 'E'://Positioning
+								StepmotorGoToEncoderPosition(mot, p1, 1);
+								ack = 1;//send ack
+						break;
+						case 'n'://Positioning without offset
+								StepmotorGoToEncoderPosition(mot, p1, 0);
+								ack = 1;//send ack
+						break;
+						case 'F'://goto Force detection or to Encoder Position
+						break;
+						case '-'://Stop
+							StepmotorStop(mot);
+							ack = 1;//send ack
+						break;
+						case 'C'://Set current in mA
+							//StepmotorSetCurrent(mot, p1);
+							//ack = 1;//send ack
+						break;
+						case 'I'://go to injector reference position
+						break;
+						case 'J'://go to injector docking position
+						break;
+						case 'd'://go to injector docking position
+						break;
+						case 's'://write user defined position into EEPROM
+							switch(buf[3])
+							{
+								case 'N':
+										StepmotorSetEncoderOffset(mot, StepmotorControl[mot].encoderposition);
+										ack = 1;//send ack
+								break;
+								case 'C'://Clear Offset
+										StepmotorSetEncoderOffset(mot, 0);
+										ack = 1;//send ack
+								break;
+								case 'L':
+										StepmotorSetLockPosition(mot, p1);
+										ack = 1;//send ack
+								break;
+								case 'I':
+										//StepmotorStoreInjectorReference(MOTOR_X, p1);
+										//ack = 1;//send ack
+								break;
+								case 'J':
+										//StepmotorStoreInjectorDockingpos(MOTOR_X, p1);
+										//ack = 1;//send ack
+								break;
+								case 'U':
+										//StepmotorStoreInjectorBacklash(MOTOR_X, p1);
+										//ack = 1;//send ack
+								break;
+							}
+						break;
+					}
+			break;
+            case 's'://SPI-Functions
+            break;
+            case 'T'://Therm-Functions  /* not present */
+            break;
+            case 'r'://reset
+			  switch(buf[1])
+			  {
+				  case 'T'://reset Timestamp
+					SystemTimeIn100ms = 0;
+					ack = 1;//send ack
+				  break;
+			  }
+		    break;
+            case 'U'://Filter-Changer Functions
+				mot = buf[1] - '1';
+				if(mot != MOTOR_X)/* the only Filter changer is MOTOR_X */
+				{
+					ack = 2;//send nack
+					break;
+				}
+				p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//get the first parameter
+				switch(buf[2])
+				{
+				   case 'R'://Reference Drive
+						   StepmotorReferenceDrive(mot);
+						   ack = 1;//send ack
+				   break;
+				   case 'P'://Position the stepper motor
+						   StepmotorGoToEncoderPosition(mot, p1, 0);
+						   ack = 1;//send ack
+				   break;
+				   case 'F'://Filter Position
+					       if((p1 >= 0) && (p1 <= 5))//check for valid filter nummer
+						   {
+							   StepmotorSetFilterPosition(mot, p1);
+							   ack = 1;//send ack
+						   }
+						   if(buf[3] == 'L')
+						   {
+							   StepmotorGoToEncoderPosition(mot, Filter.minposition, 0);
+							   Filter.actualfilter = -1;
+						   }
+						   if(buf[3] == 'H')
+						   {
+							   StepmotorGoToEncoderPosition(mot, Filter.maxposition, 0);
+							   Filter.actualfilter = 99;
+						   }
+				   break;
+				   case 'S'://Set Filter Position in EEPROM
+					   switch(buf[3])
+					   {
+						   case '1'://Filter 1
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_POSITION_1, p1, 0);
+							   Filter.position[0] = p1;
+							   ack = 1;//send ack
+						   break;
+						   case '2'://Filter 2
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_POSITION_2, p1, 0);
+							   Filter.position[1] = p1;
+							   ack = 1;//send ack
+						   break;
+						   case '3'://Filter 3
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_POSITION_3, p1, 0);
+							   Filter.position[2] = p1;
+							   ack = 1;//send ack
+						   break;
+						   case '4'://Filter 4
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_POSITION_4, p1, 0);
+							   Filter.position[3] = p1;
+							   ack = 1;//send ack
+						   break;
+						   case '5'://Filter 5
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_POSITION_5, p1, 0);
+							   Filter.position[4] = p1;
+							   ack = 1;//send ack
+						   break;
+						   case 'D'://DateTime
+							   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//get the first parameter
+							   p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//get the first parameter
+							   p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//get the first parameter
+							   p4 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);//get the first parameter
+							   p5 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);//get the first parameter
+							   SetFilterDate(p1, p2, p3, p4, p5);
+							   ack = 1;//send ack
+						   break;
+						   case 'L'://min filter pos
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_MIN_POSITION, p1, 0);
+							   Filter.minposition = p1;
+							   ack = 1;//send ack
+						   break;
+						   case 'H'://max filter pos
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_MAX_POSITION, p1, 0);
+							   Filter.maxposition = p1;
+							   ack = 1;//send ack
+						   break;
+
+					   }
+				   break;
+				   case 'V'://velocity
+					   StepmotorSetSpeed(mot, p1);
+					   ack = 1;//send ack
+				   break;
+				}
+			break;
+            case 'h'://Hardware
+			  p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//number
+			   switch(buf[1])
+			   {
+				   case 'D'://Device-ID
+					   I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_DEVICE_ID, p1, 0);
+					   ack = 1;//send ack
+				   break;
+				   case 'S'://Serial Number
+					   I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_DEVICE_SERIAL_NUM, p1, 0);
+					   ack = 1;//send ack
+				   break;
+				   case 'E':
+					   I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_EXPOSURE_SAFETY_DISABLE, p1, 0);
+					   ExposureControl[0].safetydisabled = p1;
+					   ack = 1;//send ack
+				   break;
+				   case 'L'://Transport Lock (1 - locked)
+					  // I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_TRANSPORT_LOCK, p1, 0);
+					   //ack = 1;//send ack
+				   break;
+				   case 'O'://Optic
+					   switch(buf[2])
+					   {
+						   case 'T':
+							   //convert ASCII to integer
+							   dat = strout[0];
+							   dat = dat << 8;
+							   dat |= strout[1];
+							   dat = dat << 8;
+							   dat |= strout[2];
+							   dat = dat << 8;
+							   dat |= strout[3];
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_OPTIC_TYP, dat, 0);
+							   ack = 1;//send ack
+						   break;
+						   case 'S':
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_OPTIC_SN, p1, 0);
+							   ack = 1;//send ack
+						   break;
+						   case 'P'://Pixel Resolution
+							   I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_PIXEL_RESOLUTION, p1, 0);
+							   ack = 1;//send ack
+						   break;
+					   }
+				   break;
+			   }
+			break;
+		   case 'Q':
+			   	 switch(buf[1])
+				 {
+					 case 'C'://
+						 switch(buf[2])
+						 {
+							  case 'D'://Set QC Date and Time DateTime
+								   p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//get the first parameter
+								   p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//get the first parameter
+								   p3 = GetParameter(strout, buf, 3, RX_BUFFER_SIZE);//get the first parameter
+								   p4 = GetParameter(strout, buf, 4, RX_BUFFER_SIZE);//get the first parameter
+								   p5 = GetParameter(strout, buf, 5, RX_BUFFER_SIZE);//get the first parameter
+								   SetQcDate(p1, p2, p3, p4, p5);
+								   ack = 1;//send ack
+							   break;
+						 }
+					break;
+				}
+			break;
+            case '?'://Request
+                  switch(buf[1])
+                  {
+                      case 'A'://Read I2C-ADC of NTCs (Therm_D)
+                  	  break;
+					  case 'B'://Barcode
+					  break;
+					  case 'C'://CAN
+                	  	  switch(buf[2])
+                	  	  {
+                	  	  	  case 'E'://error
+                	  	  		  	  CanReadError();
+                	  	  		  	  strcpy(strTemp,"CE;err:");
+                	  	  		  	  itoa(CanError.errorcode, strt, 10);
+                	  	  		  	  strcat(strTemp, strt);
+                	  	  		  	  strcat(strTemp, ";tx:");
+                	  	  		  	  itoa(CanError.txerrcount, strt, 10);
+                	  	  		  	  strcat(strTemp, strt);
+                	  	  		  	  strcat(strTemp, ";rx:");
+									  itoa(CanError.rxerrcount, strt, 10);
+									  strcat(strTemp, strt);
+									  strcat(strTemp, ";OFF:");
+									  itoa(CanError.busoff, strt, 10);
+									  strcat(strTemp, strt);
+									  strcat(strTemp, ";PAS:");
+									  itoa(CanError.buspassive, strt, 10);
+									  strcat(strTemp, strt);
+									  strcat(strTemp, ";WAR:");
+									  itoa(CanError.warning, strt, 10);
+									  strcat(strTemp, strt);
+									  strcat(strTemp, ";");
+                	  	  		  	  SendToCommunicationPort(strTemp, strlen(strTemp));
+                	  	  		  	  ack = 0;//send nothing
+                	  	  	  break;
+                	  	  }
+                  break;
+				  case 'D'://Date
+					 strcpy(strTemp,__DATE__);
+					  SendToCommunicationPort(strTemp, strlen(strTemp));
+					  ack = 0;//send nothing
+				  break;
+				  case 'E'://Request Exposure Calibration Results
+				 	  p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//get the first parameter: line
+				 	  switch(buf[2])
+					  {
+						  case 'Q':
+							  switch(buf[3])
+							  {
+								  case 'P'://Exposure Power Calibration results
+									  switch(buf[4])
+									  {
+										 case 'O'://Current Offset
+											 dat = ExposureCalibration[p1].powcalibrationoffset;
+											 strcpy(strTemp,"EQPO;");
+											 itoa(p1, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ":");
+											 itoa(dat, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ";");
+											 SendToCommunicationPort(strTemp, strlen(strTemp));
+											 ack = 0;//send nothing
+										 break;
+										 case 'G'://Current Gradient
+											 dat = (uint32_t)(ExposureCalibration[p1].powcalibrationgradient * 1000000);
+											 strcpy(strTemp,"EQPG;");
+											 itoa(p1, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ":");
+											 itoa(dat, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ";");
+											 SendToCommunicationPort(strTemp, strlen(strTemp));
+											 ack = 0;//send nothing
+										 break;
+									 }
+								  break;
+								  case 'F'://Exposure Foto Calibration results
+									  switch(buf[4])
+									  {
+										 case 'O'://Current Offset
+											 dat = ExposureCalibration[p1].fotocalibrationoffset;
+											 strcpy(strTemp,"EQFO;");
+											 itoa(p1, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ":");
+											 itoa(dat, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ";");
+											 SendToCommunicationPort(strTemp, strlen(strTemp));
+											 ack = 0;//send nothing
+										 break;
+										 case 'G'://Current Gradient
+											 dat = (uint32_t)(ExposureCalibration[p1].fotocalibrationgradient * 1000000);
+											 strcpy(strTemp,"EQFG;");
+											 itoa(p1, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ":");
+											 itoa(dat, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ";");
+											 SendToCommunicationPort(strTemp, strlen(strTemp));
+											 ack = 0;//send nothing
+										 break;
+									 }
+								  break;
+								  case 'C'://Exposure Current Calibration results
+									  switch(buf[4])
+									  {
+										 case 'O'://Current Offset
+											 dat = LedCurrentCalibration.calibrationoffset;
+											 strcpy(strTemp,"EQCO:");
+											 itoa(dat, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ";");
+											 SendToCommunicationPort(strTemp, strlen(strTemp));
+											 ack = 0;//send nothing
+										 break;
+										 case 'G'://Current Gradient
+											 dat = (uint32_t)(LedCurrentCalibration.calibrationgradient * 1000000);
+											 strcpy(strTemp,"EQCG:");
+											 itoa(dat, strt, 10);
+											 strcat(strTemp, strt);
+											 strcat(strTemp, ";");
+											 SendToCommunicationPort(strTemp, strlen(strTemp));
+											 ack = 0;//send nothing
+										 break;
+									 }
+								  break;
+							  }
+					  break;
+					  }
+				  break;
+				  case 'F'://Fan
+					  switch(buf[2])
+					  {
+						  case 'L'://Low Limit
+							  strcpy(strTemp,"FL:");
+							  itoa(FanControl.templow, strt, 10);
+							  strcat(strTemp, strt);
+							  SendToCommunicationPort(strTemp, strlen(strTemp));
+							  ack = 0;//send nothing
+						  break;
+						  case 'H'://High Limit
+							  strcpy(strTemp,"FH:");
+							  itoa(FanControl.temphigh, strt, 10);
+							  strcat(strTemp, strt);
+							  SendToCommunicationPort(strTemp, strlen(strTemp));
+							  ack = 0;//send nothing
+						  break;
+					  }
+           	  	  break;
+				  case 'K'://Read Calibration
+					  switch(buf[2])
+					 {
+						 case 'I'://Inclinometer
+						 break;
+					 }
+				  break;
+				  case 'i'://I2C debugging
+					  p1 = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//i2Cx
+					  p2 = GetParameter(strout, buf, 2, RX_BUFFER_SIZE);//adr
+					  switch(buf[2])
+					  {
+						 case 'P':// presence
+							 if(p1 == 1)//i2C1
+							 {
+								 dat = IsI2cAddressPresent(I2C1, p2);
+								 if(dat == 1)
+								 {
+									 strcpy(strTemp,"iP;1;");
+									 itoa(p2, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ":ok;");
+									 SendToCommunicationPort(strTemp, strlen(strTemp));
+									 ack = 0;//send nothing
+								 }
+								 else
+								 {
+									 strcpy(strTemp,"iP;1;");
+									 itoa(p2, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ":fail;");
+									 SendToCommunicationPort(strTemp, strlen(strTemp));
+									 ack = 0;//send nothing
+								 }
+							 }
+							 if(p1 == 2)//i2C2
+							 {
+								 dat = IsI2cAddressPresent(I2C2, p2);
+								 if(dat == 1)
+								 {
+									 strcpy(strTemp,"iP;2;");
+									 itoa(p2, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ":ok;");
+									 SendToCommunicationPort(strTemp, strlen(strTemp));
+									 ack = 0;//send nothing
+								 }
+								 else
+								 {
+									 strcpy(strTemp,"iP;2;");
+									 itoa(p2, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ":fail;");
+									 SendToCommunicationPort(strTemp, strlen(strTemp));
+									 ack = 0;//send nothing
+								 }
+							 }
+						 break;
+						 case 'T'://TMP275-Temperature
+							 dat = ExposureReadSensorTemperature();
+							 strcpy(strTemp,"iT:0x");
+							 itoa(dat, strt, 16);
+							 strcat(strTemp, strt);
+							 strcat(strTemp, ";");
+							 SendToCommunicationPort(strTemp, strlen(strTemp));
+							 ack = 0;//send nothing
+						 break;//
+						 case 'I'://current
+							 dat = ExposureReadCurrent();
+							 strcpy(strTemp,"iI:0x");
+							 itoa(dat, strt, 16);
+							 strcat(strTemp, strt);
+							 strcat(strTemp, ";");
+							 SendToCommunicationPort(strTemp, strlen(strTemp));
+							 ack = 0;//send nothing
+						 break;//
+						 case 'B'://brightness
+							 dat = ExposureReadBrightness();
+							 strcpy(strTemp,"iB:0x");
+							 itoa(dat, strt, 16);
+							 strcat(strTemp, strt);
+							 strcat(strTemp, ";");
+							 SendToCommunicationPort(strTemp, strlen(strTemp));
+							 ack = 0;//send nothing
+						 break;//
+						 case 'V'://voltage
+							 dat = ExposureReadVoltage();
+							 strcpy(strTemp,"iV:0x");
+							 itoa(dat, strt, 16);
+							 strcat(strTemp, strt);
+							 strcat(strTemp, ";");
+							 SendToCommunicationPort(strTemp, strlen(strTemp));
+							 ack = 0;//send nothing
+						 break;//
+					 }
+				  break;
+				  case 'M'://EEPROM-Memory Read
+						 adr = GetParameter(strout, buf, 1, RX_BUFFER_SIZE);//address
+						 switch(buf[2])
+						 {
+						 	 case 'A'://Conroller/Co-Controller
+							 break;
+							 case 'B'://byte
+									 dat = I2cReadEepromByte(adr);
+									 strcpy(strTemp,"MB;");
+								     itoa(adr, strt, 10);
+								     strcat(strTemp, strt);
+								     strcat(strTemp, ":");
+								     itoa(dat, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ";");
+									 //sprintf(strTemp, "MB;%u:%u;", adr, dat);
+									 SendToCommunicationPort(strTemp, strlen(strTemp));
+									 ack = 0;//send nothing
+							 break;
+							 case 'I'://integer (32bit)
+									 dat = I2cReadEepromInteger(adr);
+									 strcpy(strTemp,"MI;");
+									 itoa(adr, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ":");
+									 itoa(dat, strt, 10);
+									 strcat(strTemp, strt);
+									 strcat(strTemp, ";");
+									 //sprintf(strTemp, "MI;%u:%d;", adr, dat);
+									 SendToCommunicationPort(strTemp, strlen(strTemp));
+									 ack = 0;//send nothing
+							 break;
+							 case 'C'://Board-Configuration
+								 switch(buf[3])
+								 {
+									 case 'A'://Acceleration Sensor
+									 break;
+									 case 'B'://Battery
+									 break;
+									 case 'H'://Humidity Sensor
+									 break;
+									 case 'P'://Air Pressure Sensor
+									 break;
+								 }
+							 break;
+						 }
+				   break;
+				  case 'S'://stepmotor state //not implemented
+					    mot = buf[2] - 'X';
+						if(mot >= NUMBER_OF_STEPMOTORS)
+						{
+							ack = 2;//send nack
+							break;
+						}
+						switch(buf[3])
+						{
+							case 'N':
+								   strcpy(strTemp,"S");
+								   strTemp[2] = 0;//end sign
+								   strTemp[1] = buf[2];
+								   strcat(strTemp,"N:");
+								   itoa(StepmotorControl[mot].encoderoffset, strt, 10);
+								   strcat(strTemp, strt);
+								   strcat(strTemp, ";");
+								   SendToCommunicationPort(strTemp, strlen(strTemp));
+								   ack = 0;//send nothing
+							break;
+							case 'L':
+								   strcpy(strTemp,"S");
+								   strTemp[2] = 0;//end sign
+								   strTemp[1] = buf[2];
+								   strcat(strTemp,"L:");
+								   itoa(StepmotorControl[mot].lockposition, strt, 10);
+								   strcat(strTemp, strt);
+								   strcat(strTemp, ";");
+								   SendToCommunicationPort(strTemp, strlen(strTemp));
+								   ack = 0;//send nothing
+							break;
+						}
+				  break;
+				  case 'T'://Temperatur vom ADS1247
+					  //not present
+				  break;
+				  case 'U'://Filter Position
+					  if((buf[2] - '1') != MOTOR_X)
+					  {
+						  ack = 2;//send nack
+						  break;
+					  }
+					  if(buf[3] != 'S')
+					  {
+						  ack = 2;//send nack
+						  break;
+					  }
+					  switch(buf[4])
+					   {
+						   case '1'://Filter 1
+							   strcpy(strTemp,"U1S1:");
+							   itoa(Filter.position[0], strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case '2'://Filter 2
+							   strcpy(strTemp,"U1S2:");
+							   itoa(Filter.position[1], strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case '3'://Filter 3
+							   strcpy(strTemp,"U1S3:");
+							   itoa(Filter.position[2], strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case '4'://Filter 4
+							   strcpy(strTemp,"U1S4:");
+							   itoa(Filter.position[3], strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case '5'://Filter 5
+							   strcpy(strTemp,"U1S5:");
+							   itoa(Filter.position[4], strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case 'D'://Date
+							   ReadFilterDate();
+							   strcpy(strTemp,"U1SD;");
+							   itoa(FilterDateTime.year, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   itoa(FilterDateTime.month, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   itoa(FilterDateTime.day, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   itoa(FilterDateTime.hour, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   itoa(FilterDateTime.minute, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case 'L'://min Filter pos
+							   strcpy(strTemp,"U1SL:");
+							   itoa(Filter.minposition, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case 'H'://min Filter pos
+							   strcpy(strTemp,"U1SH:");
+							   itoa(Filter.maxposition, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+					   }
+					break;
+				  case 'Q'://QC
+					   switch(buf[2])
+					   {
+					   	   case 'C':
+					   		   switch(buf[3])
+					   		   {
+					   		   	   case 'D'://QC Date and Time
+									   ReadQcDate();
+									   strcpy(strTemp,"QCD;");
+									   itoa(QcDateTime.year, strt, 10);
+									   strcat(strTemp, strt);
+									   strcat(strTemp, ";");
+									   itoa(QcDateTime.month, strt, 10);
+									   strcat(strTemp, strt);
+									   strcat(strTemp, ";");
+									   itoa(QcDateTime.day, strt, 10);
+									   strcat(strTemp, strt);
+									   strcat(strTemp, ";");
+									   itoa(QcDateTime.hour, strt, 10);
+									   strcat(strTemp, strt);
+									   strcat(strTemp, ";");
+									   itoa(QcDateTime.minute, strt, 10);
+									   strcat(strTemp, strt);
+									   strcat(strTemp, ";");
+									   SendToCommunicationPort(strTemp, strlen(strTemp));
+									   ack = 0;//send nothing
+								   break;
+					   		   	 }
+					   		   break;
+					   }
+				  break;
+                  case 'V'://Version
+						  SendToCommunicationPort("BLINKX2OPTICCONT1.001", 21);
+						  ack = 0;//send nothing
+					break;
+                  case 'h'://Hardware
+					   switch(buf[2])
+					   {
+						   case 'D'://Device-ID
+							   dat = I2cReadEepromInteger(EEPROM_ADDRESS_DEVICE_ID);
+							   strcpy(strTemp,"hD:");
+							   itoa(dat, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case 'S'://Serial Number
+							   dat = I2cReadEepromInteger(EEPROM_ADDRESS_DEVICE_SERIAL_NUM);
+							   strcpy(strTemp,"hS:");
+							   itoa(dat, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case 'E':
+							   dat = I2cReadEepromInteger(EEPROM_ADDRESS_EXPOSURE_SAFETY_DISABLE);
+							   strcpy(strTemp,"hE:");
+							   itoa(dat, strt, 10);
+							   strcat(strTemp, strt);
+							   strcat(strTemp, ";");
+							   SendToCommunicationPort(strTemp, strlen(strTemp));
+							   ack = 0;//send nothing
+						   break;
+						   case 'L'://Transport Lock
+						   break;
+						   case 'X'://BlinkX-Typ and Serial
+						   break;
+						   case 'O'://Optic-Typ and Serial
+							   if(!(Filter.error & FILTER_ERROR_NO_EXT_EEPROM))
+							   {
+								   switch(buf[3])
+								   {
+									   case 'T':
+										   type[4] = 0;//end sign
+										   I2cReadEepromExtAscii(EEPROM_EXT_ADDRESS_OPTIC_TYP, 4, &type );
+										   strcpy(strTemp,"hOT:");
+										   strcat(strTemp, type);
+										   strcat(strTemp, ";");
+										   SendToCommunicationPort(strTemp, strlen(strTemp));
+										   ack = 0;//send nothing
+									   break;
+									   case 'S':
+										   dat = I2cReadEepromExtInteger(EEPROM_EXT_ADDRESS_OPTIC_SN);
+										   strcpy(strTemp,"hOS:");
+										   itoa(dat, strt, 10);
+										   strcat(strTemp, strt);
+										   strcat(strTemp, ";");
+										   SendToCommunicationPort(strTemp, strlen(strTemp));
+										   ack = 0;//send nothing
+									   break;
+									   case 'P':
+										   dat = I2cReadEepromExtInteger(EEPROM_EXT_ADDRESS_PIXEL_RESOLUTION);
+										   strcpy(strTemp,"hOP:");
+										   itoa(dat, strt, 10);
+										   strcat(strTemp, strt);
+										   strcat(strTemp, ";");
+										   SendToCommunicationPort(strTemp, strlen(strTemp));
+										   ack = 0;//send nothing
+									   break;
+								   }
+							   }
+							   else
+							   {
+								   ack = 3;
+							   }
+						   break;
+					   }
+				  break;
+                  case 'H'://Hardware Revision
+						  mot =  ReadHardwareVersion();
+						  strcpy(strTemp,"H:0x0");
+						  itoa(mot, strt, 16);
+						  strcat(strTemp, strt);
+						  strcat(strTemp, ";");
+						  SendToCommunicationPort(strTemp, strlen(strTemp));
+						  ack = 0;//send nothing
+					break;
+
+                  }
+      }
+
+      switch(ack)
+      {
+                case 3:
+                	SendToCommunicationPort("#", 1);//at the moment busy and unable to process this command
+                break;
+                case 2:
+                	SendToCommunicationPort("?", 1);//not acknowledge
+                break;
+                case 1:
+                	SendToCommunicationPort("!", 1);//acknowledge
+                	ValidCommandReceived = 1;
+                	TimeWithoutValidCommand = 0;
+                break;
+                case 0:
+                	//answer already sent
+                	ValidCommandReceived = 1;
+                	TimeWithoutValidCommand = 0;
+                break;
+      }
+
+      return;
+}
+
+
+
+
+
+// ******************************************************* //
+// ***                WorkSendLogData()                *** //
+// ***     work function for sending Log-Data via USB  *** //
+// ***                       AST                       *** //
+// ***                    Blink GmbH                   *** //
+// ***                    2015-11-12                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void WorkSendLogData(void)
+{
+
+	char ch = ' ';
+
+	if(LogActive == 0)
+	{
+		return;
+	}
+
+
+
+
+		if(LogActive == 2)//Power and Servo-Log-Data
+		{
+
+			   strcpy(strTemp,"$;0;");
+
+
+			   SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		  }//LogActive
+
+		if(LogActive == 3)//Stepper-Motor, Servo, Exposure
+		{
+
+				     strcpy(strTemp,"=;");
+
+
+					 //Stepper Filter
+					 itoa(StepmotorControl[MOTOR_X].finished, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_X].reference, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_X].absolutecounter/StepmotorControl[MOTOR_X].mscount, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_X].encoderposition, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_X].positioningtrycount, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_X].error, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+					 //Stepper Focus
+					 itoa(StepmotorControl[MOTOR_Y].finished, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].reference, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].absolutecounter/StepmotorControl[MOTOR_X].mscount, strt, 10);//not implemented
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].encoderposition, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].positioningtrycount, strt, 10);//not implemented
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].error, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+					 //13. - not used (ToDo: Optic-Disc-Encoder value)
+					 strcat(strTemp, "0;");
+					 //14. - not used
+					 strcat(strTemp, "0;");
+
+					 //Filter
+					 /* filter move finished */
+					 itoa(Filter.finished, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 //actual userposition:
+					 itoa(StepmotorControl[MOTOR_X].encoderposition, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 //Filterposition:
+					 itoa(Filter.actualfilter, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 //Status - not used
+					 strcat(strTemp, "0;");
+					 //Filter Error
+					 itoa(Filter.error, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+
+					 //Voltages
+					 itoa(Voltage[VOLT_UB], strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 /* Board Temperature */
+					 itoa(BoardTemperature, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+					 /* Exposure */
+					 //Current
+					 itoa(ExposureControl[EXPOSURE_A].current, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 //Voltage
+					 itoa(ExposureControl[EXPOSURE_A].voltage, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 //Brightness
+					 itoa(ExposureControl[EXPOSURE_A].brightness, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 //Sensor-Temperature
+					 itoa(ExposureControl[EXPOSURE_A].sensortemperature, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+					 //Disc Encoder
+					 itoa(StepmotorControl[MOTOR_Y].olda, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].oldb, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(StepmotorControl[MOTOR_Y].encoderposition, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+					 //Fan PWM
+					 itoa(FanControl.pwm, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+
+
+
+
+
+
+
+
+					 /*ToDo:
+					 //Exposure
+					 itoa(ExposureControl[0].curactual, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 itoa(ExposureControl[0].curlatest, strt, 10);
+					 strcat(strTemp, strt);
+					 strcat(strTemp, ";");
+					 */
+
+
+					 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+			}
+
+
+
+		if(LogActive == 4)
+		{
+				//prepare status byte of CAN StepConroller - stepmotors
+
+				 strcpy(strTemp,"�;");
+
+				 itoa(CanStepperInfo[CAN_ID_STEPPER][0].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER][0].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER][0].position, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER][0].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(/*positioningtrycount*/ 0, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER][0].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_2ND][0].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_2ND][0].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_2ND][0].position, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_2ND][0].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(/*positioningtrycount*/ 0, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_2ND][0].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_3RD][0].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_3RD][0].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_3RD][0].position, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_3RD][0].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(/*positioningtrycount*/ 0, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanStepperInfo[CAN_ID_STEPPER_3RD][0].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+
+
+				 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}//LogActive
+
+		if(LogActive == 5)
+		{
+				//Local Stepmotors and DC-Motors for BlinkX
+
+				 strcpy(strTemp,"~;");
+
+				 // Filter Stepper
+				 itoa(StepmotorControl[0].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[0].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[0].absolutecounter/16, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[0].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[0].positioningtrycount, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[0].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 // Stepper Table X
+				 itoa(StepmotorControl[1].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[1].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[1].absolutecounter/16, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[1].encoderposition - StepmotorControl[1].encoderoffset, strt, 10); // X-table-offset
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[1].positioningtrycount, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(StepmotorControl[1].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 // Stepper Table Y
+
+
+
+				 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}//LogActive
+
+		/* Log-Data */
+		if(LogActive == 6)//Script status infos //formerly: Therm for NTC-Sensors
+		{
+
+			   strcpy(strTemp,"&;");
+
+			   itoa(ScriptControl.loopcount, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.running, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.error, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.index, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.entries, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.remainingtime, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.timeout, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.loopactive, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.canid, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+			   itoa(ScriptControl.mot, strt, 10);
+			   strcat(strTemp, strt);
+			   strcat(strTemp, ";");
+
+			   SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		  }//LogActive
+
+		/* Log-Data */
+		if(LogActive == 7)//DC-Motor
+		{
+
+				 strcpy(strTemp,"@;");
+
+
+
+				 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}//LogActive
+
+
+		if(LogActive == 8)
+		{
+				//prepare status byte CAN DC-Motors of AxisController
+
+				 strcpy(strTemp,"�;");
+				 //CAN Dc-Motor 1
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][0].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][0].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][0].speed, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][0].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][0].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 //CAN Dc-Motor 2
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][1].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][1].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][1].speed, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][1].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][1].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 //CAN Dc-Motor 3
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][2].finished, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][2].reference, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][2].speed, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][2].encoderposition, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+				 itoa(CanDcMotorInfo[CAN_ID_AXIS][2].error, strt, 10);
+				 strcat(strTemp, strt);
+				 strcat(strTemp, ";");
+
+
+				 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}//LogActive
+
+		/* Log-Data BlinkBox local motors */
+		if(LogActive == 10)
+		{
+
+		}
+
+
+
+		/* Log-Data PCR Motors */
+		if(LogActive == 12)
+		{
+			 strcpy(strTemp,"C;");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+		}
+
+		/* Log-Data BlinkBox CAN Optic and Filter */
+		if(LogActive == 13)
+		{
+			 strcpy(strTemp,"D;");
+			 //CAN Dc-Motor Optic 1
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][0].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //CAN Dc-Motor Optic 2
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][1].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][1].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][1].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][1].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][1].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //CAN Dc-Motor Optic 3
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][2].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][2].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][2].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][2].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_OPTIC][2].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //CAN Dc-Motor Filter 1
+			 itoa(CanDcMotorInfo[CAN_ID_FILTER][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_FILTER][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_FILTER][0].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_FILTER][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_FILTER][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //ToDo: CAN Exposure Channel and Current
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+		}
+
+		/* Log-Data BlinkBox CAN XYZ-System */
+		if(LogActive == 14)
+		{
+			 strcpy(strTemp,"E;");
+			 //CAN Axis X: Stepper Motor Centerline X
+			 itoa(CanStepperInfo[CAN_ID_AXLE][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //CAN Axis Y: Stepper Motor Axle X
+			 itoa(CanStepperInfo[CAN_ID_CENTERLINE][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_CENTERLINE][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_CENTERLINE][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_CENTERLINE][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_CENTERLINE][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //CAN Axis Z: Stepper Motor Centerline Y
+			 itoa(CanStepperInfo[CAN_ID_AXLE][1].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][1].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][1].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][1].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_AXLE][1].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //already in log-Data F, here only for convenience
+			 itoa(CanDosageInfo.touch, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+		}
+
+		/* Log-Data BlinkBox CAN Dosage-System */
+		if(LogActive == 15)
+		{
+			 strcpy(strTemp,"F;");
+			 //CAN Axis Stepper Dosage
+			 itoa(CanStepperInfo[CAN_ID_DOSAGE][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_DOSAGE][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_DOSAGE][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_DOSAGE][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_DOSAGE][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //CAN Dc-Motor Dosage
+			 itoa(CanDcMotorInfo[CAN_ID_DOSAGE][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_DOSAGE][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_DOSAGE][0].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_DOSAGE][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_DOSAGE][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDosageInfo.pressure, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDosageInfo.touch, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		/* Log-Data BlinkBox CAN Magazine/Lysis */
+		if(LogActive == 16)
+		{
+			 strcpy(strTemp,"G;");
+			 //CAN Axis Stepper Dosage
+			 itoa(CanStepperInfo[CAN_ID_MAGAZINE][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MAGAZINE][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MAGAZINE][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(/* ToDo: ref-sensor */ 0, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(/* ToDo: end-sensor */ 0, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 /* Lysis Port A */
+			 itoa(CanLysisInfo[0].channel, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[0].active, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[0].heater, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[0].tempint, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[0].tempext, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 /* Lysis Port B */
+			 itoa(CanLysisInfo[1].channel, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[1].active, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[1].heater, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[1].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[1].tempint, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanLysisInfo[1].tempext, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		/* Log-Data BlinkBox CAN OneMech */
+		if(LogActive == 17)
+		{
+			 strcpy(strTemp,"H;");
+			 //OneMechController: Stepper X (Injector)
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //DC-Motor Rotary-Valve Cartridge
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //DC-Motor Lift
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][1].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][1].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][1].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][1].endpos, strt, 10);//!!! endpos - encoderpos at the end
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][1].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //DC-Motor Mixer
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][2].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][2].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][2].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][2].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][2].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //Cartridge Detect Sensor
+			 itoa(CanSensorInfo[CAN_ID_MECH][0].state, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //Cartridge-Not-In-Reference Sensor
+			 itoa(CanSensorInfo[CAN_ID_MECH][1].state, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //Servo PIV
+			 itoa(CanServomotorInfo[CAN_ID_MECH][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_MECH][0].pos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_MECH][0].cur, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //DC-Motor Lift Encoder
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][1].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //DC-Motor Rotary-Valve Cartridge overshoot
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].overshoot, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //Servo PIV
+			 itoa(CanServomotorInfo[CAN_ID_MECH][0].endpos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_MECH][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		/* Log-Data BlinkBox CAN OneOptic */
+		if(LogActive == 18)
+		{
+			 strcpy(strTemp,"I;");
+			 //Servo X
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][0].pos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][0].cur, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][0].fuse, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //Servo Y
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][1].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][1].pos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][1].cur, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanServomotorInfo[CAN_ID_OPTIC][1].fuse, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //Stepper (Focus)
+			 itoa(CanStepperInfo[CAN_ID_OPTIC][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_OPTIC][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_OPTIC][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_OPTIC][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_OPTIC][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //BLCD Filter-Changer
+			 //itoa(CanBrushlessInfo.finished, strt, 10);
+			 itoa(CanFilterInfo.finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //itoa(CanBrushlessInfo.position, strt, 10);
+			 itoa(CanFilterInfo.position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //itoa(CanBrushlessInfo.filterpos, strt, 10);
+			 itoa(CanFilterInfo.filterpos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //itoa(CanBrushlessInfo.status, strt, 10);
+			 itoa(CanFilterInfo.status, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //itoa(CanBrushlessInfo.error, strt, 10);
+			 itoa(CanFilterInfo.error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //itoa(CanBrushlessInfo.reference, strt, 10);
+			 itoa(CanFilterInfo.reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		/* Log-Data BlinkONE CAN OneLight */
+		if(LogActive == 19)
+		{
+			 strcpy(strTemp,"J;");
+			 itoa(CanSensorInfo[CAN_ID_LIGHT][0].state, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanSensorInfo[CAN_ID_LIGHT][1].state, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		/* Log-Data CAN OneThermController */
+		if(LogActive == 20)
+		{
+			 strcpy(strTemp,"K;");
+			 itoa(CanThermInfo.actualtemperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.solltemperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.heatsinktemperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.ntc2temperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.ntc3temperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.slidetemperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.peltierenabled, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.pwm, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.hk, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.regulationenabled, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.reached, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.scriptindex, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.scriptrunning, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanThermInfo.scripterror, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 /* PCR-Chamber-Motor */
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 /* Proximity-Sensor */
+			 itoa(CanSensorInfo[CAN_ID_PCR][0].state, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 /* PCR-Chamber-Motor Endpos*/
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][0].endpos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 /* Therm Failures */
+			 itoa(CanThermInfo.errorcode, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //Add system time
+			 itoa(SystemTimeIn100ms, strt, 10);//
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //estimated Temperature
+			 itoa(CanThermInfo.estimatedtemperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //virtual Temperature
+			 itoa(CanThermInfo.virtualtemperature, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		/* Log-Data Local Sensors and CAN Sensors */
+		if(LogActive == 21)
+		{
+			 strcpy(strTemp,"L;");
+
+			 //Spacer: 3x (UB, 5P, Temperature)
+			 //strcat(strTemp,"0;0;0;");
+
+			 //PC-Current
+			 //Ambient Light
+			 strcat(strTemp, "0;0;0;0;");
+
+
+
+
+		}
+
+		/* Log-Data CAN XY-Table */
+		if(LogActive == 22)
+		{
+			 strcpy(strTemp,"M;");
+
+			 //OneThermController: Stepper Table X
+			 itoa(CanStepperInfo[CAN_ID_PCR][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_PCR][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_PCR][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_PCR][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //DC-Motor Table Y
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][1].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][1].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][1].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_PCR][1].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //Therm X-Y-Table
+			 itoa(CanXYTableInfo.finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanXYTableInfo.reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanXYTableInfo.xpos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanXYTableInfo.ypos, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+		if(LogActive == 23)
+		{
+			 strcpy(strTemp,"N;");
+
+			 //OneMechController: Stepper X (Injector)
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].position, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanStepperInfo[CAN_ID_MECH][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //DC-Motor Rotary-Valve Cartridge
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].finished, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].reference, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].speed, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].encoderposition, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanDcMotorInfo[CAN_ID_MECH][0].error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //Bloodsensor
+			 itoa(CanBloodsensorInfo.blue, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanBloodsensorInfo.red, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanBloodsensorInfo.off, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 // Weighcell
+			 itoa(CanWeighcellInfo.detect, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 itoa(CanWeighcellInfo.value, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 //Bloodsensor edge
+			 itoa(CanBloodsensorInfo.edge, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //volume
+			 itoa(CanBloodsensorInfo.encvolume, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+			 //error
+			 itoa(CanBloodsensorInfo.error, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 // Weighcell Force in 1/10N
+			 itoa(CanWeighcellInfo.force, strt, 10);
+			 strcat(strTemp, strt);
+			 strcat(strTemp, ";");
+
+			 SendToCommunicationPort(strTemp, strlen(strTemp));
+
+		}
+
+
+
+
+
+}
+
+// ******************************************************* //
+// ***                WorkScript()                     *** //
+// ***     work function for script execution          *** //
+// ***                       AST                       *** //
+// ***                    Blink GmbH                   *** //
+// ***                    2015-11-12                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void WorkScript(void)
+{
+	if(ScriptControl.running)
+	{
+
+		ScriptControl.remainingtime--;
+		ScriptControl.running_time++;
+		if(ScriptControl.remainingtime < 0)
+		{
+			NextScriptIndex();
+			return;
+		}
+		//special controls, depending on script function
+		switch(Script[ScriptControl.index].typ)
+		{
+
+			case SCRIPT_THERM_SET_TEMPERATURE:
+			break;
+			case SCRIPT_THERM_REGULATION:
+			break;
+			case SCRIPT_PAUSE:
+			break;
+			case SCRIPT_LOOP:
+			break;
+			case SCRIPT_CAN_STEPPER_REFERENCE:
+				if(CanStepperInfo[ScriptControl.canid][ScriptControl.mot].reference == STEPMOTOR_REFERENCE_DRIVE_OK)
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if( (ScriptControl.timeout <= 0) || (CanStepperInfo[ScriptControl.canid][ScriptControl.mot].reference == STEPMOTOR_REFERENCE_DRIVE_FAIL) )
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_DCMOTOR_REFERENCE:
+				if(CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].reference == DCMOTOR_REFERENCE_DRIVE_OK)
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if( (ScriptControl.timeout <= 0) || (CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].reference == DCMOTOR_REFERENCE_DRIVE_FAIL) )
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_STEPPER_POSITIONING:
+				if(CanStepperInfo[ScriptControl.canid][ScriptControl.mot].position == Script[ScriptControl.index].par2)
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if(ScriptControl.timeout <= 0)
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_STEPPER_ENCODER_POSITIONING:
+				if( (CanStepperInfo[ScriptControl.canid][ScriptControl.mot].position == Script[ScriptControl.index].par2)
+						|| (CanStepperInfo[ScriptControl.canid][ScriptControl.mot].finished  && ((CanStepperInfo[ScriptControl.canid][ScriptControl.mot].error & 0x0FF0) == 0)))
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if( (ScriptControl.timeout <= 0) || ((CanStepperInfo[ScriptControl.canid][ScriptControl.mot].error & 0x0FF0) != 0) )
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_STEPPER_GOTO_ENCODER_LIQUID:
+				if( (CanStepperInfo[ScriptControl.canid][ScriptControl.mot].finished)
+					  && ((CanStepperInfo[ScriptControl.canid][ScriptControl.mot].error & MOTOR_ERROR_OVERCURRENT ) == 0))//CanStepperInfo[ScriptControl.canid][ScriptControl.mot].finished )
+				{
+					//successful, if finished and no error
+					return;
+				}
+				if( (CanStepperInfo[ScriptControl.canid][ScriptControl.mot].position == Script[ScriptControl.index].par2)
+						|| (CanStepperInfo[ScriptControl.canid][ScriptControl.mot].error & 0x0FF0)) //CanStepperInfo[ScriptControl.canid][ScriptControl.mot].finished )
+				{
+					//not successful, if position reached without touch detected
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if(ScriptControl.timeout <= 0)
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_DCMOTOR_ENCODER_POSITIONING:
+				if( (CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].encoderposition == Script[ScriptControl.index].par2)
+						|| CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished )
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if(ScriptControl.timeout <= 0)
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_BRUSHLESS_POSITIONING:
+			case SCRIPT_CAN_FILTER_POSITIONING:
+				if(CanBrushlessInfo.finished)
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if(ScriptControl.timeout <= 0)
+				{
+					ScriptControl.error++;
+					if(Script[ScriptControl.index].par4 == 0)
+					{
+						ExitScript();
+						return;
+					}
+					NextScriptIndex();
+					return;
+				}
+			break;
+			case SCRIPT_CAN_CARTRIDGE_POSITIONING:
+			case SCRIPT_CAN_LIFT_POSITIONING:
+			case SCRIPT_CAN_CHAMBER_POSITIONING:
+			case SCRIPT_CAN_MIXER:
+				if(CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished)
+				{
+					return;
+				}
+				//timeout control
+				ScriptControl.remainingtime++;
+				ScriptControl.timeout--;
+				if(ScriptControl.timeout <= 0)
+				{
+					ScriptControl.error++;
+					NextScriptIndex();
+					return;
+				}
+			break;
+
+		}//switch
+
+	}//running
+
+
+}
+
+// ******************************************************* //
+// ***                NextScriptIndex()                *** //
+// ***     work function for script execution          *** //
+// ***                       AST                       *** //
+// ***                    Blink GmbH                   *** //
+// ***                    2015-11-12                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void NextScriptIndex(void)
+{
+	//int32_t i = 0;
+	uint32_t ui = 0;
+	ScriptControl.running_time = 0;
+
+	if(ScriptControl.entries > ScriptControl.index)
+	{
+	    /* - next entry -*/
+		ScriptControl.index++;
+		switch(Script[ScriptControl.index].typ)
+		{
+			case SCRIPT_EXPOSURE:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par1;
+				//SwitchExposureOn(Script[ScriptControl.index].par2, Script[ScriptControl.index].par3, Script[ScriptControl.index].par4, /*period*/1000, /*pulse*/1000);
+			break;
+			case SCRIPT_THERM_SET_TEMPERATURE:
+
+			break;
+			case SCRIPT_THERM_REGULATION:
+
+			break;
+			case SCRIPT_STEPPER_REFERENCE:
+			break;
+			case SCRIPT_CAN_STEPPER_REFERENCE:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par2;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				//clear the memory for the can answer
+				CanStepperInfo[ScriptControl.canid][ScriptControl.mot].reference = STEPMOTOR_REFERENCE_NONE;
+				CanAppendMessageToTxQueue(ScriptControl.canid, StepmotorCanCommand[ScriptControl.mot].referencedrive, 0, 0, 0);
+			break;
+			case SCRIPT_DCMOTOR_REFERENCE:
+			break;
+			case SCRIPT_CAN_DCMOTOR_REFERENCE:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par2;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				//clear the memory for the can answer
+				CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].reference = DCMOTOR_REFERENCE_NONE;
+				CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].referencedrive, 0, 0, 0);
+			break;
+		    case SCRIPT_STEPPER_SET_SPEED:
+			break;
+			case SCRIPT_CAN_STEPPER_SET_SPEED:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par3;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				CanAppendMessageToTxQueue(ScriptControl.canid, StepmotorCanCommand[ScriptControl.mot].setspeed, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_DCMOTOR_SET_SPEED:
+			break;
+			case SCRIPT_CAN_DCMOTOR_SET_SPEED:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par3;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				CanAppendMessageToTxQueue(ScriptControl.canid, StepmotorCanCommand[ScriptControl.mot].setspeed, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_STEPPER_POSITIONING:
+			break;
+			case SCRIPT_STEPPER_ENCODER_POSITIONING:
+			break;
+			case SCRIPT_STEPPER_GOTO_ENCODER_LIQUID:
+			break;
+			case SCRIPT_CAN_STEPPER_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				//set an different position before the first answer is received
+				CanStepperInfo[ScriptControl.canid][ScriptControl.mot].position = Script[ScriptControl.index].par2 - 1;
+				CanAppendMessageToTxQueue(ScriptControl.canid, StepmotorCanCommand[ScriptControl.mot].gotoposition, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_STEPPER_ENCODER_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				//set an different position before the first answer is received
+				CanStepperInfo[ScriptControl.canid][ScriptControl.mot].position = Script[ScriptControl.index].par2 - 1;
+				CanAppendMessageToTxQueue(ScriptControl.canid, StepmotorCanCommand[ScriptControl.mot].gotoencoder, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_STEPPER_GOTO_ENCODER_LIQUID:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				//set an different position before the first answer is received
+				CanStepperInfo[ScriptControl.canid][ScriptControl.mot].position = Script[ScriptControl.index].par2 - 1;
+				CanAppendMessageToTxQueue(ScriptControl.canid, StepmotorCanCommand[ScriptControl.mot].gotoencoderliquid, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_DCMOTOR_ENCODER_POSITIONING:
+			break;
+			case SCRIPT_CAN_DCMOTOR_ENCODER_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//set an different position before the first answer is received
+				CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].encoderposition = Script[ScriptControl.index].par2 - 1;
+				CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].gotoencoder, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_EXPOSURE:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//line
+				CanAppendMessageToTxQueue(ScriptControl.canid, ExposureCanCommand[Script[ScriptControl.index].par2].setline, Script[ScriptControl.index].par3, 0, 0);
+				//set current
+				CanAppendMessageToTxQueue(ScriptControl.canid, ExposureCanCommand[Script[ScriptControl.index].par2].setcurrent, Script[ScriptControl.index].par4, 0, 0);
+			break;
+			case SCRIPT_CAN_BRUSHLESS_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//reset the position-ok flag
+				CanBrushlessInfo.finished = 0;
+				CanAppendMessageToTxQueue(ScriptControl.canid, CAN_COMMAND_BRUSHLESS_SET_POSITION, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_FILTER_POSITIONING:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//reset the position-ok flag
+				CanBrushlessInfo.finished = 0;
+				CanAppendMessageToTxQueue(ScriptControl.canid, CAN_COMMAND_FILTER_SET_POSITION, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_LIGHT_START_ANIMATION:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//Animation
+				CanAppendMessageToTxQueue(ScriptControl.canid, CAN_COMMAND_LIGHT_START_ANIMATION, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_LIGHT_STOP_ANIMATION:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//stop Animation
+				CanAppendMessageToTxQueue(ScriptControl.canid, CAN_COMMAND_LIGHT_STOP_ANIMATION, 0, 0, 0);
+			break;
+			case SCRIPT_SERVO_POSITIONING:
+
+			break;
+			case SCRIPT_CAN_SERVO_POSITIONING:
+				ScriptControl.remainingtime = Script[ScriptControl.index].par3;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//set position
+				CanAppendMessageToTxQueue(ScriptControl.canid, ServomotorCanCommand[Script[ScriptControl.index].par1].setpos, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_CARTRIDGE_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//reset finished flag
+				CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished = 0;
+				CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].gotocartpos, Script[ScriptControl.index].par2, 0, 0);
+			break;
+			case SCRIPT_CAN_LIFT_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				if(Script[ScriptControl.index].par2 == 0)
+				{
+					//reset finished flag
+					CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished = 0;
+					CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].gotolblow, /*PWM*/Script[ScriptControl.index].par4, 0, 0);
+				}
+				if(Script[ScriptControl.index].par2 == 1)
+				{
+					//reset finished flag
+					CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished = 0;
+					CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].gotolbhigh, /*PWM*/Script[ScriptControl.index].par4, 0, 0);
+				}
+			break;
+			case SCRIPT_CAN_CHAMBER_POSITIONING:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.timeout = Script[ScriptControl.index].par3;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				if(Script[ScriptControl.index].par2 == 0)
+				{
+					//reset finished flag
+					CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished = 0;
+					CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].open, /*PWM*/Script[ScriptControl.index].par4, 0, 0);
+				}
+				if(Script[ScriptControl.index].par2 == 1)
+				{
+					//reset finished flag
+					CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished = 0;
+					CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].close, /*PWM*/Script[ScriptControl.index].par4, 0, 0);
+				}
+			break;
+			case SCRIPT_CAN_MIXER:
+				ScriptControl.remainingtime = 1;
+				ScriptControl.mot = Script[ScriptControl.index].par1;
+				ScriptControl.canid = Script[ScriptControl.index].par5;
+				//reset finished flag
+				CanDcMotorInfo[ScriptControl.canid][ScriptControl.mot].finished = 0;
+				CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].setspeed, /*U/min*/Script[ScriptControl.index].par4, 0, 0);
+				CanAppendMessageToTxQueue(ScriptControl.canid, DcMotorCanCommand[ScriptControl.mot].starttime, (/*dir*/Script[ScriptControl.index].par2 << 24 ) | /*time*/Script[ScriptControl.index].par3, 0, 0);
+			break;
+			case SCRIPT_PAUSE:
+				//set the Time
+				ScriptControl.remainingtime = Script[ScriptControl.index].par1;
+			break;
+			case SCRIPT_LOOP:
+				//set the loop counter
+				if(ScriptControl.loopactive)
+				{
+					ScriptControl.loopcount--;
+					if(ScriptControl.loopcount == 0)
+					{
+						//exit the Loop
+						ScriptControl.loopactive = 0;
+						ScriptControl.remainingtime = 1;
+						return;
+					}
+				}
+				else
+				{
+					//first loop
+					ScriptControl.loopcount = Script[ScriptControl.index].par3;
+					//remember that we are in the loop
+					ScriptControl.loopactive = 1;
+				}
+				//jump back
+				ui = ScriptControl.index - Script[ScriptControl.index].par2;
+				ScriptControl.index = ui - 1;//one position more back
+				//start next with the desired index
+				ScriptControl.remainingtime = 1;
+			break;
+		}
+	}
+	else
+	{
+		//end script
+		ScriptControl.running = 0;
+	}
+
+}
+
+
+// ******************************************************* //
+// ***                ExitScript()                     *** //
+// ***  exit script in case of timeout or user action  *** //
+// ***                       AST                       *** //
+// ***                    Blink AG                     *** //
+// ***                    2016-10-20                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void ExitScript(void)
+{
+	//end script
+	ScriptControl.running = 0;
+	//Regulation and PWM off
+	//ToDo
+}
+
+
+
+
+// ****************************************************************************** //
+// ***         Get Parameter()                                                *** //
+// ***        get parameter from string seperated by ';'                      *** //
+// ***      input: out - buffer, where the parameter string will be written   *** //
+// ***              in - input string                                         *** //
+// ***             num -  index of desired parameter                          *** //
+// ***          strsize - size of out buffer                                  *** //
+// ***       return: parameter as integer                                     *** //
+// ****************************************************************************** //
+int32_t GetParameter(char * out, char * in, uint8_t num, uint8_t strsize)
+{
+
+	uint8_t i;//parameter count
+	uint8_t j;//sign in count
+	uint8_t k;//sign out count
+    int32_t ret;
+
+
+    j = 0;
+    i = 0;
+    k = 0;
+    while(in[j] != 0)
+    {
+        if(in[j] == ';')
+        {
+            i++;
+        }
+        else
+        {
+            if(i == num)
+            {
+                out[k] = in[j];
+                out[k+1] = 0;//append always end sign
+                k++;
+            }
+        }
+
+        j++;
+        if(j >= strsize)
+        {
+            break;
+        }
+    }
+
+    ret = atol(out);
+
+    return ret;
+
+}
+
+
+
+
+
+// ********************************************** //
+// ***            LoadDemoScript()            *** //
+// ***         loading of demo script         *** //
+// ***               AST                      *** //
+// ***             Blink AG                   *** //
+// ***             2016-10-20                 *** //
+// ***          return: none                  *** //
+// ********************************************** //
+void LoadDemoScript(uint8_t ui)
+{
+	//erase old script
+	memset(Script, 0, sizeof(Script));
+	memset(&ScriptControl, 0, sizeof(ScriptControl));
+
+	if(ui == 0)//AraTherm Demo-PCR
+	{
+		 //fill the script
+		 //solltemperatur
+		 Script[0].typ = SCRIPT_THERM_SET_TEMPERATURE;
+		 Script[0].par1 = 1;//Time
+		 Script[0].par2 = 30000;//temperature
+		 Script[0].par3 = 0;//timeout in 100ms
+		 Script[0].par4 = 1;//weiter nach Timeout
+		 //Regulation
+		 Script[1].typ = SCRIPT_THERM_REGULATION;
+		 Script[1].par1 = 1;//Time
+		 Script[1].par2 = 1;//regulation on
+		 //solltemperatur
+		 Script[2].typ = SCRIPT_THERM_SET_TEMPERATURE;
+		 Script[2].par1 = DemoPcr.holdtime1;//Time after reached in 100ms
+		 Script[2].par2 = DemoPcr.temperature1;//temperature
+		 Script[2].par3 = 1800;//timeout in 100ms
+		 Script[2].par4 = 1;//weiter nach Timeout
+		 //solltemperatur
+		 Script[3].typ = SCRIPT_THERM_SET_TEMPERATURE;
+		 Script[3].par1 = DemoPcr.holdtime2;//Time after reached in 100ms
+		 Script[3].par2 = DemoPcr.temperature2;//temperature
+		 Script[3].par3 = 1800;//timeout in 100ms
+		 Script[3].par4 = 1;//weiter nach Timeout
+		 //solltemperatur
+		 Script[4].typ = SCRIPT_THERM_SET_TEMPERATURE;
+		 Script[4].par1 = DemoPcr.holdtime3;//Time after reached in 100ms
+		 Script[4].par2 = DemoPcr.temperature3;//temperature
+		 Script[4].par3 = 1800;//timeout in 100ms
+		 Script[4].par4 = 1;//weiter nach Timeout
+		 //Loop
+		 Script[5].typ = SCRIPT_LOOP;
+		 Script[5].par1 = 1;//Time
+		 Script[5].par2 = 4;//jump n steps back
+		 Script[5].par3 = DemoPcr.cycles - 1;//Loops
+		 //solltemperatur
+		 Script[6].typ = SCRIPT_THERM_SET_TEMPERATURE;
+		 Script[6].par1 = 100;//Time after reached in 100ms
+		 Script[6].par2 = 20000;//temperature
+		 Script[6].par3 = 1800;//timeout in 100ms
+		 Script[6].par4 = 1;//weiter nach Timeout
+		 //solltemperatur
+		 Script[7].typ = SCRIPT_THERM_REGULATION;
+		 Script[7].par1 = 1;//Time after reached in 100ms
+		 Script[7].par2 = 0;//off
+		 //
+		 Script[8].typ = 0;
+		 Script[8].par1 = 0;//Time
+		 Script[8].par2 = 0;//current
+		 Script[8].par3 = 0;//regulation off
+
+		 ScriptControl.entries = 8;
+
+		 // to display the remaining loops in log data during the first loop
+		 ScriptControl.loopcount = DemoPcr.cycles;
+
+	}
+
+	if(ui == 1)//Stepper Motor script
+	{
+		/*
+			 //fill the script
+			 //reference drive
+			 Script[0].typ = SCRIPT_STEPPER_REFERENCE;
+			 Script[0].par1 = MOTOR_X;//Motor
+			 Script[0].par2 = 2;//Pause
+			 Script[0].par3 = 200;//timeout in 100ms
+			 Script[0].par4 = 1;//proceed after Timeout
+			 //SetSpeed
+			 Script[1].typ = SCRIPT_STEPPER_SET_SPEED;
+			 Script[1].par1 = MOTOR_X;//Motor
+			 Script[1].par2 = 40;//Speed
+			 Script[1].par3 = 2;//Pause
+			 Script[1].par4 = 0;//-
+			 //Positioning
+			 Script[2].typ = SCRIPT_STEPPER_POSITIONING;
+			 Script[2].par1 = MOTOR_X;//Motor
+			 Script[2].par2 = 1000;//Position
+			 Script[2].par3 = 100;//Timeout
+			 Script[2].par4 = 1;//proceed after timeout
+			 //Positioning
+			 Script[3].typ = SCRIPT_STEPPER_POSITIONING;
+			 Script[3].par1 = MOTOR_X;//Motor
+			 Script[3].par2 = 2000;//Position
+			 Script[3].par3 = 100;//Timeout
+			 Script[3].par4 = 1;//proceed after timeout
+			 //Loop
+			 Script[4].typ = SCRIPT_LOOP;
+			 Script[4].par1 = 1;//Time
+			 Script[4].par2 = 7;//jump n steps back
+			 Script[4].par3 = 5;//Loops
+			 //Positioning
+			 Script[5].typ = SCRIPT_STEPPER_POSITIONING;
+			 Script[5].par1 = MOTOR_X;//Motor
+			 Script[5].par2 = 20;//Position
+			 Script[5].par3 = 100;//Timeout
+			 Script[5].par4 = 1;//proceed after timeout
+
+
+			 ScriptControl.entries = 16;
+			 */
+
+	}
+
+	if(ui == 2)//Stepper Motor script
+	{
+			 //fill the script
+			 //reference drive
+			 Script[0].typ = SCRIPT_CAN_STEPPER_REFERENCE;
+			 Script[0].par1 = CAN_MOTOR_1ST;//Motor
+			 Script[0].par2 = 2;//Pause
+			 Script[0].par3 = 200;//timeout in 100ms
+			 Script[0].par4 = 1;//proceed after Timeout
+			 //reference drive
+			 Script[1].typ = SCRIPT_CAN_STEPPER_REFERENCE;
+			 Script[1].par1 = CAN_MOTOR_2ND;//Motor
+			 Script[1].par2 = 2;//Pause
+			 Script[1].par3 = 200;//timeout in 100ms
+			 Script[1].par4 = 1;//proceed after Timeout
+			 //reference drive
+			 Script[2].typ = SCRIPT_CAN_STEPPER_REFERENCE;
+			 Script[2].par1 = CAN_MOTOR_3RD;//Motor
+			 Script[2].par2 = 2;//Pause
+			 Script[2].par3 = 200;//timeout in 100ms
+			 Script[2].par4 = 1;//proceed after Timeout
+			 //SetSpeed
+			 Script[3].typ = SCRIPT_CAN_STEPPER_SET_SPEED;
+			 Script[3].par1 = CAN_MOTOR_1ST;//Motor
+			 Script[3].par2 = 40;//Speed
+			 Script[3].par3 = 2;//Pause
+			 Script[3].par4 = 0;//-
+			 //SetSpeed
+			 Script[4].typ = SCRIPT_CAN_STEPPER_SET_SPEED;
+			 Script[4].par1 = CAN_MOTOR_2ND;//Motor
+			 Script[4].par2 = 30;//Speed
+			 Script[4].par3 = 2;//Pause
+			 Script[4].par4 = 0;//-
+			//SetSpeed
+			 Script[5].typ = SCRIPT_CAN_STEPPER_SET_SPEED;
+			 Script[5].par1 = CAN_MOTOR_3RD;//Motor
+			 Script[5].par2 = 50;//Speed
+			 Script[5].par3 = 2;//Pause
+			 Script[5].par4 = 0;//-
+			 //Positioning
+			 Script[6].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[6].par1 = CAN_MOTOR_1ST;//Motor
+			 Script[6].par2 = 1000;//Position
+			 Script[6].par3 = 100;//Timeout
+			 Script[6].par4 = 1;//proceed after timeout
+			 //Positioning
+			 Script[7].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[7].par1 = CAN_MOTOR_2ND;//Motor
+			 Script[7].par2 = 500;//Position
+			 Script[7].par3 = 100;//Timeout
+			 Script[7].par4 = 1;//proceed after timeout
+			//Positioning
+			 Script[8].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[8].par1 = CAN_MOTOR_3RD;//Motor
+			 Script[8].par2 = 1500;//Position
+			 Script[8].par3 = 100;//Timeout
+			 Script[8].par4 = 1;//proceed after timeout
+			 //Positioning
+			 Script[9].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[9].par1 = CAN_MOTOR_1ST;//Motor
+			 Script[9].par2 = 2000;//Position
+			 Script[9].par3 = 100;//Timeout
+			 Script[9].par4 = 1;//proceed after timeout
+			 //Positioning
+			 Script[10].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[10].par1 = CAN_MOTOR_2ND;//Motor
+			 Script[10].par2 = 1500;//Position
+			 Script[10].par3 = 100;//Timeout
+			 Script[10].par4 = 1;//proceed after timeout
+			//Positioning
+			 Script[11].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[11].par1 = CAN_MOTOR_3RD;//Motor
+			 Script[11].par2 = 100;//Position
+			 Script[11].par3 = 100;//Timeout
+			 Script[11].par4 = 1;//proceed after timeout
+			 //Positioning
+			 Script[12].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[12].par1 = CAN_MOTOR_2ND;//Motor
+			 Script[12].par2 = 20;//Position
+			 Script[12].par3 = 100;//Timeout
+			 Script[12].par4 = 1;//proceed after timeout
+			 //Loop
+			 Script[13].typ = SCRIPT_LOOP;
+			 Script[13].par1 = 1;//Time
+			 Script[13].par2 = 7;//jump n steps back
+			 Script[13].par3 = 5;//Loops
+			 //Positioning
+			 Script[14].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[14].par1 = CAN_MOTOR_1ST;//Motor
+			 Script[14].par2 = 20;//Position
+			 Script[14].par3 = 100;//Timeout
+			 Script[14].par4 = 1;//proceed after timeout
+			//Positioning
+			 Script[15].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[15].par1 = CAN_MOTOR_2ND;//Motor
+			 Script[15].par2 = 20;//Position
+			 Script[15].par3 = 100;//Timeout
+			 Script[15].par4 = 1;//proceed after timeout
+			//Positioning
+			 Script[16].typ = SCRIPT_CAN_STEPPER_POSITIONING;
+			 Script[16].par1 = CAN_MOTOR_3RD;//Motor
+			 Script[16].par2 = 20;//Position
+			 Script[16].par3 = 100;//Timeout
+			 Script[16].par4 = 1;//proceed after timeout
+
+			 ScriptControl.entries = 16;
+
+	}
+
+	//start script
+	ScriptControl.index = -1;
+	ScriptControl.running = 1;
+	ScriptControl.remainingtime = 1;
+}
+
+// ********************************************** //
+// ***            SendToCommunicationPort()   *** //
+// ***    sends string to communicaton port   *** //
+// ***               AST                      *** //
+// ***             Blink AG                   *** //
+// ***             2016-02-29                 *** //
+// ***          return: none                  *** //
+// ********************************************** //
+void SendToCommunicationPort(char * buf, unsigned char len)
+{
+
+		if(CommunicationPort == COMMUNICATION_PORT_CAN)
+		{
+			  //ToDo
+		}
+		if(CommunicationPort == COMMUNICATION_PORT_UART)
+		{
+			UartPcAppendMessageToTxQueue(buf, len);
+		}
+
+}
+
+// ******************************************************* //
+// ***                WorkDmo()                        *** //
+// ***          work function for Demo                 *** //
+// ***                       AST                       *** //
+// ***                    Blink AG                     *** //
+// ***                    2016-07-26                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void WorkDemo(void)
+{
+
+
+		//special controls, depending on script function
+		switch(DemoCounter)
+		{
+			case 1:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_RED, ON, 0, 0);
+			break;
+			case 2:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_RED, OFF, 0, 0);
+				CanAppendMessageToTxQueue(CAN_ID_PIPETTE, CAN_COMMAND_LED_DEBUG_GREEN, ON, 0, 0);
+			break;
+			case 3:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_YELLOW, ON, 0, 0);
+			break;
+			case 4:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_YELLOW, OFF, 0, 0);
+				CanAppendMessageToTxQueue(CAN_ID_PIPETTE, CAN_COMMAND_LED_DEBUG_GREEN, OFF, 0, 0);
+			break;
+			case 5:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_GREEN, ON, 0, 0);
+				CanAppendMessageToTxQueue(CAN_ID_PIPETTE, CAN_COMMAND_LED_DEBUG_BLUE, ON, 0, 0);
+			break;
+			case 6:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_GREEN, OFF, 0, 0);
+			break;
+			case 7:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_BLUE, ON, 0, 0);
+				CanAppendMessageToTxQueue(CAN_ID_PIPETTE, CAN_COMMAND_LED_DEBUG_BLUE, OFF, 0, 0);
+			break;
+			case 8:
+				CanAppendMessageToTxQueue(CAN_ID_OPTIC, CAN_COMMAND_LED_DEBUG_BLUE, OFF, 0, 0);
+			break;
+			case 9:
+			break;
+			case 10:
+				DemoCounter = 0;
+			break;
+		}//switch
+
+		DemoCounter++;
+
+
+}
+
+
+
+
+// ******************************************************* //
+// ***                WorkAdc()                        *** //
+// ***          work function for ADC2 and ADC3        *** //
+// ***                       AST                       *** //
+// ***                    Blink AG                     *** //
+// ***                    2016-07-26                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void WorkAdc(void)
+{
+
+	uint32_t ui;
+
+
+	/* UB */
+	/*  3300 * (82k + 10k) / (10k * 4095) = 7.414*/
+	ui = AdcConversionResult[ADC_INDEX_UB] * 7414 / 1000;
+	Voltage[VOLT_UB] = ui;
+
+
+
+	/* Temperatures */
+	BoardTemperature = CalculateNtcTemperature(AdcConversionResult[ADC_INDEX_NTC_BOARD], NTC_BETAS_BOARD);
+
+
+
+	/* restart ADC */
+	ADC_SoftwareStartConv(ADC1);
+
+}
+
+// ******************************************************************** //
+// ***       Function: CalculateNtcTemperature                      *** //
+// ***       Purpose:  calculates Temperature in 1/1000�C           *** //
+// ***               from the NTC-ADC-Data of    Controller Board   *** //
+// ***       Purpose:  calculates   Temperature                     *** //
+// ***       Input: adc - ADC-Value                                 *** //
+// ***       Return: Temperature in 1/1000�C                        *** //
+// ******************************************************************** //
+int32_t CalculateNtcTemperature(int32_t adc, float betas)
+{
+
+
+	float32_t u, rntc, x, t;
+
+
+	/* calculation Voltage */
+	u = (adc * NTC_UREF * 1) / 0x0FFF;
+
+
+	/* calculation the Resistance of the NTC in Ohm*/
+	rntc = u * NTC_RPULLUP / (NTC_UB - u);
+
+	if(rntc == NTC_RT1)
+	{
+		/* prevent log(0) */
+		t = NTC_T1 - NTC_TNULL;
+	}
+	else
+	{
+		/* side calculation:  Napierian logarithm */
+		x = log(NTC_RT1 / rntc);
+
+		t = ( ((NTC_T1 * betas) / x) / (( betas / x) - NTC_T1) ) - NTC_TNULL;
+	}
+
+
+
+	return (int32_t)(t * 1000);
+
+
+
+}
+
+// ******************************************************************** //
+// ***       Function: StopScript                                   *** //
+// ***       Purpose:  stops Script                                 *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void StopScript(void)
+{
+
+	ScriptControl.index = -1;
+	ScriptControl.remainingtime = 1;
+	ScriptControl.running = 0;
+
+}
+
+
+// ******************************************************************** //
+// ***       Function: StopScriptAndPeltierOff                      *** //
+// ***       Purpose:  stops Script and switches Peltier off        *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void StopScriptAndPeltierOff(void)
+{
+	int i;
+
+	StopScript();
+
+	//Peltier: n.a.
+
+
+}
+
+// ******************************************************************** //
+// ***       Function: StartScript                                  *** //
+// ***       Purpose:  starts Script execution                      *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void StartScript(void)
+{
+
+	ScriptControl.index = -1;
+	ScriptControl.remainingtime = 0;
+	ScriptControl.running = 1;
+	ScriptControl.running_time = 0;
+
+}
+
+
+// ******************************************************************** //
+// ***       Function: ScriptWatchChanges                           *** //
+// ***       Purpose:  checks changes and sends CAN Messages        *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void ScriptWatchChanges(void)
+{
+
+	uint32_t state;
+
+	/* check, if changes happend */
+	if(    (CanThermInfo.scriptindex != ScriptControl.index)
+		|| (CanThermInfo.scriptrunning != ScriptControl.running)
+		|| (CanThermInfo.scripterror != ScriptControl.error) )
+	{
+		// store the new values /
+		CanThermInfo.scriptindex = ScriptControl.index;
+		CanThermInfo.scriptrunning = ScriptControl.running;
+		CanThermInfo.scripterror = ScriptControl.error;
+		// build the composite status /
+		state = (CanThermInfo.scripterror << 24) | (CanThermInfo.scriptindex << 8) | CanThermInfo.scriptrunning;
+		// send the message /
+		CanAppendMessageToTxQueue(((MyCanId << 5) | CAN_ID_CONTROLLER), CAN_COMMAND_THERM_SCRIPT_ANSWER_STATE, state, 0, 0);
+	}
+
+
+}
+
+
+// ******************************************************************** //
+// ***       Function: ClearScript                                  *** //
+// ***       Purpose:  clears Script table                          *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void ClearScript(void)
+{
+
+	StopScript();
+
+	memset(Script, 0, sizeof(Script));
+    memset(&ScriptControl, 0, sizeof(ScriptControl));
+
+
+}
+
+// ******************************************************************** //
+// ***       Function: AddScriptEntry                               *** //
+// ***       Purpose:  adds script in table                         *** //
+// ***       Input: typ - script typ                                *** //
+// ***           par1...par5: Script Parameter                      *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void AddScriptEntry(uint8_t typ, uint32_t par1, uint32_t par2, uint32_t par3, uint32_t par4, uint32_t par5, uint32_t par6)
+{
+
+	if(ScriptControl.entries < (MAX_SCRIPT_ENTRIES - 1))
+	 {
+		 Script[ScriptControl.entries].typ = typ;
+		 Script[ScriptControl.entries].par1 = par1;
+		 Script[ScriptControl.entries].par2 = par2;
+		 Script[ScriptControl.entries].par3 = par3;
+		 Script[ScriptControl.entries].par4 = par4;
+		 Script[ScriptControl.entries].par5 = par5;
+		 Script[ScriptControl.entries].par6 = par6;
+		 ScriptControl.entries++;
+	 }
+
+
+}
+
+// ******************************************************************** //
+// ***       Function: EditScriptEntry                              *** //
+// ***       Purpose:  edits last added script entry                *** //
+// ***       Input: num - par number (1...5)                        *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void EditScriptEntry(uint8_t num, uint32_t par)
+{
+	if((ScriptControl.entries < 1) || (ScriptControl.entries >= MAX_SCRIPT_ENTRIES))
+	{
+		return;
+	}
+
+	switch(num)
+	{
+		case 1:
+			Script[ScriptControl.entries - 1].par1 = par;
+		break;
+		case 2:
+			Script[ScriptControl.entries - 1].par2 = par;
+		break;
+		case 3:
+			Script[ScriptControl.entries - 1].par3 = par;
+		break;
+		case 4:
+			Script[ScriptControl.entries - 1].par4 = par;
+		break;
+		case 5:
+			Script[ScriptControl.entries - 1].par5 = par;
+		break;
+		case 6:
+			Script[ScriptControl.entries - 1].par6 = par;
+		break;
+		default:
+			return;
+
+
+	}
+
+
+}
+
+
+
+
+
+
+
+
+
+// ********************************************** //
+// ***               SetLogOutput()           *** //
+// ***       sets  Log Output                 *** //
+// ***       0 - no log output                *** //
+// ***       >0 - log output on               *** //
+// ***             inc: defines.h             *** //
+// ********************************************** //
+void SetLogOutput(uint8_t state)
+{
+	LogActive = state;
+
+}
+
+// ********************************************** //
+
+
+void DebugInitTimer1(void)
+{
+
+
+	  GPIO_InitTypeDef 		GPIO_InitStructure;
+	  TIM_TimeBaseInitTypeDef  TIM_BaseStructure;
+	  TIM_OCInitTypeDef          TIM_OCStructure;
+
+	  //int i;
+
+	  uint16_t Prescalerval;
+
+	  /* Enable SYSCFG clock */
+	  RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+	  /* GPIO clock enable */
+	  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+
+	  EnableTimerPeriphClock(TIM1);
+
+	  /* Light output Pins Configuration */
+
+	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10;
+	  GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	  GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_TIM1);
+	  GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_TIM1);
+	  GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
+
+
+	  /* Time Base configuration for 168 MHz Clock */
+	  TIM_BaseStructure.TIM_Prescaler = 4;
+	  TIM_BaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	  TIM_BaseStructure.TIM_Period = 25;		// Reset Value = Auto-Reload-Register
+	  TIM_BaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	  TIM_BaseStructure.TIM_RepetitionCounter = 0; // Update event occurs after downcounting underflow
+
+	   /* Initialize TIM1 */
+	  TIM_TimeBaseInit(TIM1, &TIM_BaseStructure);
+
+
+	  TIM_OCStructure.TIM_OCMode = TIM_OCMode_PWM2;
+	  TIM_OCStructure.TIM_OutputState = TIM_OutputState_Enable;
+	  TIM_OCStructure.TIM_OutputNState = TIM_OutputNState_Enable;
+	  TIM_OCStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+	  TIM_OCStructure.TIM_OCNPolarity = TIM_OCNPolarity_High;
+	  TIM_OCStructure.TIM_OCIdleState = TIM_OCIdleState_Reset;
+	  TIM_OCStructure.TIM_OCNIdleState = TIM_OCIdleState_Set;
+	  TIM_OCStructure.TIM_Pulse = 10;		// duty cycle, initialize value
+
+	  /* Channel 1  */
+	  TIM_OC1Init(TIM1, &TIM_OCStructure);
+	  TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
+	  /* Channel 2  */
+	  TIM_OC2Init(TIM1, &TIM_OCStructure);
+	  TIM_OC2PreloadConfig(TIM1, TIM_OCPreload_Enable);
+	/* Channel 3  */
+	  TIM_OC3Init(TIM1, &TIM_OCStructure);
+	  TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
+
+	  TIM_CtrlPWMOutputs(TIM1, ENABLE);
+
+	  TIM_ARRPreloadConfig(TIM1, ENABLE);
+
+	  /* Timer 1 enable counter */
+	  TIM_Cmd(TIM1, ENABLE);
+
+	  //TIM_SetCompare1(TIM1, 12);
+
+
+
+}
+
+
+
+// ******************************************************************** //
+// ***       Function: DarkfieldInit                                *** //
+// ***       Purpose:  called from Power.c during switch on         *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void DarkfieldInit(void)
+{
+
+	memset(&Darkfield, 0, sizeof(Darkfield));
+
+	/* Check, if external EEPROM is present */
+	 if(IsI2cAddressPresent(I2C1, I2C_ADDRESS_LM3509))
+	 {
+			 Darkfield.i2cpresent = 1;
+
+	 }
+
+	 //dummy read command
+	 I2cReadEepromInteger(EEPROM_ADDRESS_DEVICE_ID);
+
+
+
+}
+
+// ******************************************************************** //
+// ***       Function: SetFilterDate                                *** //
+// ***       Purpose:  writes Filter date and Time into EEPROM      *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void SetFilterDate(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute)
+{
+
+	uint32_t data;
+
+	data = year;
+	data = data << 4;
+	data |= (month & 0x0F);
+	data = data << 5;
+	data |= (day & 0x1F);
+	data = data << 5;
+	data |= (hour & 0x1F);
+	data = data << 6;
+	data |= (minute & 0x3F);
+
+	I2cAddJob(I2C_JOB_EEPROM_EXT_WRITE_INTEGER, EEPROM_EXT_ADDRESS_FILTER_DATETIME, data, 0);
+
+
+
+}
+
+// ***************************************************************************** //
+// ***       Function: ReadFilterDate                                        *** //
+// ***       Purpose:  read Filter date and time from EEPROM into structure  *** //
+// ***       Input: none                                                     *** //
+// ***       Return: none                                                    *** //
+// ***************************************************************************** //
+void ReadFilterDate(void)
+{
+
+	uint32_t data;
+
+	data = I2cReadEepromExtInteger(EEPROM_EXT_ADDRESS_FILTER_DATETIME);
+
+	if(data == 0xFFFFFFFF)
+	{
+		memset(&FilterDateTime, 0, sizeof(FilterDateTime));
+		data = DEFAULT_DATE;
+	}
+
+
+	FilterDateTime.year = data >> 20;
+	FilterDateTime.month = (data >> 16) & 0x0F;
+	FilterDateTime.day = (data >> 11) & 0x1F;
+	FilterDateTime.hour = (data >> 6) & 0x1F;
+	FilterDateTime.minute = data & 0x3F;
+
+
+
+
+}
+
+
+// ***************************************************************************** //
+// ***       Function: DecodeFilterDate                                      *** //
+// ***       Purpose:  decodes Filter date and time from 32bit-value         *** //
+// ***       Input: none                                                     *** //
+// ***       Return: none                                                    *** //
+// ***************************************************************************** //
+void DecodeFilterDate(uint32_t data)
+{
+
+
+	if(data == 0xFFFFFFFF)
+	{
+		memset(&FilterDateTime, 0, sizeof(FilterDateTime));
+		data = DEFAULT_DATE;
+	}
+
+
+	FilterDateTime.year = data >> 20;
+	FilterDateTime.month = (data >> 16) & 0x0F;
+	FilterDateTime.day = (data >> 11) & 0x1F;
+	FilterDateTime.hour = (data >> 6) & 0x1F;
+	FilterDateTime.minute = data & 0x3F;
+
+
+
+
+}
+
+// ******************************************************************** //
+// ***       Function: SetQcDate                                *** //
+// ***       Purpose:  writes Filter date and Time into EEPROM      *** //
+// ***       Input: none                                            *** //
+// ***       Return: none                                           *** //
+// ******************************************************************** //
+void SetQcDate(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute)
+{
+
+	uint32_t data;
+
+
+	data = year;
+	data = data << 4;
+	data |= (month & 0x0F);
+	data = data << 5;
+	data |= (day & 0x1F);
+	data = data << 5;
+	data |= (hour & 0x1F);
+	data = data << 6;
+	data |= (minute & 0x3F);
+
+	I2cAddJob(I2C_JOB_EEPROM_WRITE_INTEGER, EEPROM_ADDRESS_QC_DATETIME, data, 0);
+
+
+
+}
+
+// ***************************************************************************** //
+// ***       Function: ReadQcDate                                            *** //
+// ***       Purpose:  read Filter date and time from EEPROM into structure  *** //
+// ***       Input: none                                                     *** //
+// ***       Return: none                                                    *** //
+// ***************************************************************************** //
+void ReadQcDate(void)
+{
+
+	uint32_t data;
+
+	data = I2cReadEepromInteger(EEPROM_ADDRESS_QC_DATETIME);
+
+	if(data == 0xFFFFFFFF)
+	{
+		memset(&QcDateTime, 0, sizeof(QcDateTime));
+		data = DEFAULT_DATE;
+	}
+
+
+	QcDateTime.year = data >> 20;
+	QcDateTime.month = (data >> 16) & 0x0F;
+	QcDateTime.day = (data >> 11) & 0x1F;
+	QcDateTime.hour = (data >> 6) & 0x1F;
+	QcDateTime.minute = data & 0x3F;
+
+
+
+
+}
+
+// ******************************************************* //
+// ***                WorkFan()                        *** //
+// ***           work function for Fan                 *** //
+// ***                       AST                       *** //
+// ***                    Blink AG                     *** //
+// ***                    2017-03-30                   *** //
+// ***                   return: none                  *** //
+// ******************************************************* //
+void WorkFan(void)
+{
+
+
+		if(FanControl.regulation)
+		{
+				if(BoardTemperature < FanControl.templow)
+				{
+
+					FanSetPwm(FanControl.offpwm);
+				}
+
+				if(BoardTemperature > FanControl.temphigh)
+				{
+
+					FanSetPwm(FanControl.onpwm);
+				}
+
+		}
+
+
+
+}
+
+
