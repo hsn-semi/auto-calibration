@@ -391,11 +391,11 @@ int main(void)
 
 
 	  }
-//	  if (Go5000ms){
-//		  Go5000ms = 0;
-//		  my_main();
-//
-//	  }
+  if (Go5000ms){
+		  Go5000ms = 0;
+		  my_main();
+
+	  }
 
 
 
@@ -433,170 +433,58 @@ double power_prediction(int *ptr_I, float *ptr_U, float *ptr_F){
 
        	return (a[0] * (*ptr_I) * (*ptr_I) + a[1] * (*ptr_I)) * (a[2] * (*ptr_I) + a[3] * (*ptr_U) * (*ptr_U) + a[4] * (*ptr_U) + a[5] * (*ptr_F) + a[6]);
    }
-///////////PID struct
-
-typedef struct {
-    double kp;
-    double ki;
-    double kd;
-    double prevError;
-    double integral;
-} PID;
-
-double PID_Update(PID *pid, double error, double dt) {
 
 
-    // Anti-windup: Prevent integral from growing too large
-//    const double integral_limit = 100.0; // limit for integral
+void RunCalibration(void)
+//Function to predict power
 
-    // Accumulate integral only if the error is significant
-    if (fabs(error) > 1e-6) {
-        pid->integral += error * dt;
 
-        // Limit the integral term to prevent wind-up
-//        if (pid->integral > integral_limit) pid->integral = integral_limit;
-//        if (pid->integral < -integral_limit) pid->integral = -integral_limit;
-    } else {
-        pid->integral = 0; // Reset integral when error is  small
-    }
-
-    // Accumulate integral
-//    pid->integral += error * dt;
-
-    // Calculate derivative
-    double derivative = (error - pid->prevError) / dt;
-
-    // PID output
-    double output = (pid->kp * error)
-                  + (pid->ki * pid->integral)
-                  + (pid->kd * derivative);
-
-    // Save this error as previous for next iteration
-    pid->prevError = error;
-    return output;
+double power_prediction(double *I, double *U, double *F) {
+   double a[7] = {-1.03e-6, 0.0032, -9.61e-5, 0.0007, -0.0028, 1.28e-6, -0.00018};
+   double term1 = (a[0] * (*I) * (*I)) + (a[1] * (*I));
+   double term2 = (a[2] * (*I)) + (a[3] * (*U) * (*U)) + (a[4] * (*U)) + (a[5] * (*F)) + a[6];
+   return term1 * term2;
 }
 
 
-//PID Initialization
 
-//PID gains
-static PID myPID = {
-    .kp = 10.0,
-    .ki = 15.0,
-    .kd = 0.0,
-    .prevError = 0.0,
-    .integral   = 0.0
-};
+// Function to adjust LED current
+void adjust_LED(float *ptr_I, double *ptr_cur, double *ptr_pre, float *ptr_U, float *ptr_F)
+  {
 
 
-//PID controller to adjust LED
 
-void adjust_LED(int *ptr_I, double *ptr_cur, double *ptr_pre, float *ptr_U, float *ptr_F)
-{
-    const double tolerance = 1e-6;
-    double difference = fabs(*ptr_cur - *ptr_pre);
 
-    //  (update loop time)
-    double dt = 1.0;
-//    double dt = 0.1;
+      const double tolerance = 1e-4; // Set the tolerance value
+      double difference = fabs(*ptr_cur - *ptr_pre);
+//       difference = round (difference* 1e4)/ 1e4;
+//       int max_iterations= 1000;
+//       int iterations= 0;
 
-    while (difference >= tolerance && *ptr_pre != 0 && *ptr_cur < *ptr_pre) {
-        // Calculate the error (target - current)
-        double error = (*ptr_pre - *ptr_cur);
-//        double error = fabs(*ptr_cur - *ptr_pre);
-        // PID output
-        double pidOutput = PID_Update(&myPID, error, dt);
+      // Check if the power difference is small enough
+      while (difference >= tolerance && *ptr_pre != 0 && *ptr_cur < *ptr_pre) {
+   	   // Adjust the current based on the power difference
+//    	   if (*ptr_cur > *ptr_pre) {
+////    	   *ptr_I -= 1; // Decrease current
+//    	   } else {
+   	   *ptr_I += 0.1; // Increase current
+//    	   }
+//    	   *ptr_pre  = *ptr_cur;
 
-        // Update *ptr_I using the PID result
-        *ptr_I += pidOutput;
 
-        printf("Error: %f, PID Output: %f\n", error, pidOutput);
 
-        // Clamp if out of range
-        if (*ptr_I < 45 || *ptr_I > 650) {
-            strcpy(strTemp, "Current out of range, holding at this value\n");
-            SendToCommunicationPort(strTemp, strlen(strTemp));
+//       Delayms(200);
+      //predict power again with the updated current
+      *ptr_cur = power_prediction(ptr_I, ptr_U, ptr_F);
 
-            // Clamp *ptr_I
-            *ptr_I = (*ptr_I < 45) ? 45 : 650;
-            return;
-        }
+      //recalculate the difference
+       difference = fabs (*ptr_cur - *ptr_pre);
+//       difference = round (difference* 1e4)/ 1e4;
 
-        // Recompute power
-        *ptr_cur = power_prediction(ptr_I, ptr_U, ptr_F);
-        difference = fabs(*ptr_cur - *ptr_pre);
 
-        // Optional logging
-        strcpy(strTemp, "Adjusted Current: ");
-        char strt[40];
-//        sprintf(strt, "%.1f", *ptr_I);
-        sprintf(strt, "%d", *ptr_I);
-//        itoa(*ptr_I, strt, 10);
-        strcat(strTemp, strt);
-        SendToCommunicationPort(strTemp, strlen(strTemp));
-
-//        Delayms(100);
-    }
+  }
+      return;
 }
-///////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-//CALIBRATION LOOP
-// Constants and parameter array 'a'
-//void RunCalibration(void)
-	// Function to predict power
-
-
-//double power_prediction(double *I, double *U, double *F) {
-//    double a[7] = {-1.03e-6, 0.0032, -9.61e-5, 0.0007, -0.0028, 1.28e-6, -0.00018};
-//    double term1 = (a[0] * (*I) * (*I)) + (a[1] * (*I));
-//    double term2 = (a[2] * (*I)) + (a[3] * (*U) * (*U)) + (a[4] * (*U)) + (a[5] * (*F)) + a[6];
-//    return term1 * term2;
-//}
-
-
-
-   // Function to adjust LED current
-//void adjust_LED(float *ptr_I, double *ptr_cur, double *ptr_pre, float *ptr_U, float *ptr_F)
-//   {
-//
-//
-//
-//
-//       const double tolerance = 1e-4; // Set the tolerance value
-//       double difference = fabs(*ptr_cur - *ptr_pre);
-////       difference = round (difference* 1e4)/ 1e4;
-////       int max_iterations= 1000;
-////       int iterations= 0;
-//
-//       // Check if the power difference is small enough
-//       while (difference >= tolerance && *ptr_pre != 0 && *ptr_cur < *ptr_pre) {
-//    	   // Adjust the current based on the power difference
-////    	   if (*ptr_cur > *ptr_pre) {
-//////    	   *ptr_I -= 1; // Decrease current
-////    	   } else {
-//    	   *ptr_I += 0.1; // Increase current
-////    	   }
-////    	   *ptr_pre  = *ptr_cur;
-//
-//
-//
-////       Delayms(200);
-//       //predict power again with the updated current
-//       *ptr_cur = power_prediction(ptr_I, ptr_U, ptr_F);
-//
-//       //recalculate the difference
-//        difference = fabs (*ptr_cur - *ptr_pre);
-////       difference = round (difference* 1e4)/ 1e4;
-//
-
-//   }
-//       return;
-//}
 
    // Main control loop
 int my_main() {
