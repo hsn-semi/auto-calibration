@@ -1,0 +1,914 @@
+13:53:19 **** Incremental Build of configuration Debug for project blinkx ****
+make -j8 all 
+Building file: ../startup/sysmem.c
+Building file: ../src/can.c
+Building file: ../src/exposure.c
+Building file: ../src/i2c.c
+Invoking: MCU GCC Compiler
+Invoking: MCU GCC Compiler
+Building file: ../src/main.c
+Invoking: MCU GCC Compiler
+Invoking: MCU GCC Compiler
+Building file: ../src/stepmotor.c
+C:\Users\hqasemi\workspace\blinkx\Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/can.d" -MT"src/can.o" -o "src/can.o" "../src/can.c"
+Building file: ../src/stm32f4xx_it.c
+Invoking: MCU GCC Compiler
+C:\Users\hqasemi\workspace\blinkx\Debug
+C:\Users\hqasemi\workspace\blinkx\Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/exposure.d" -MT"src/exposure.o" -o "src/exposure.o" "../src/exposure.c"
+Invoking: MCU GCC Compiler
+C:\Users\hqasemi\workspace\blinkx\Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"startup/sysmem.d" -MT"startup/sysmem.o" -o "startup/sysmem.o" "../startup/sysmem.c"
+Building file: ../src/syscalls.c
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/i2c.d" -MT"src/i2c.o" -o "src/i2c.o" "../src/i2c.c"
+C:\Users\hqasemi\workspace\blinkx\Debug
+Invoking: MCU GCC Compiler
+C:\Users\hqasemi\workspace\blinkx\Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/main.d" -MT"src/main.o" -o "src/main.o" "../src/main.c"
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/stepmotor.d" -MT"src/stepmotor.o" -o "src/stepmotor.o" "../src/stepmotor.c"
+Invoking: MCU GCC Compiler
+C:\Users\hqasemi\workspace\blinkx\Debug
+C:\Users\hqasemi\workspace\blinkx\Debug
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/stm32f4xx_it.d" -MT"src/stm32f4xx_it.o" -o "src/stm32f4xx_it.o" "../src/stm32f4xx_it.c"
+arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -DSTM32 -DSTM32F4 -DSTM32F407VGTx -DSTM32F407G_DISC1 -DDEBUG -D#ARM_MATH_CM4 -D#STM32F40_41xxx -D#STM32F40XX -D#USE_STDPERIPH_DRIVER -I"C:/Users/hqasemi/workspace/blinkx/inc" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/core" -I"C:/Users/hqasemi/workspace/blinkx/CMSIS/device" -I"C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc" -O0 -g3 -Wall -fmessage-length=0 -ffunction-sections -c -MMD -MP -MF"src/syscalls.d" -MT"src/syscalls.o" -o "src/syscalls.o" "../src/syscalls.c"
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+In file included from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_adc.h:38:0,
+                 from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_conf.h:34,
+                 from ../src/exposure.c:12:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/device/stm32f4xx.h:122:3: error: #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+  #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   ^~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_adc.h:38:0,
+                 from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_conf.h:34,
+                 from ../src/i2c.c:18:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/device/stm32f4xx.h:122:3: error: #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+  #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   ^~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_rcc.h:37:0,
+                 from ../src/can.c:26:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/device/stm32f4xx.h:122:3: error: #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+  #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   ^~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_adc.h:38:0,
+                 from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_conf.h:34,
+                 from ../src/main.c:17:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/device/stm32f4xx.h:122:3: error: #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+  #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   ^~~~~
+make: *** [startup/sysmem.o] Error 1
+startup/subdir.mk:30: recipe for target 'startup/sysmem.o' failed
+make: *** Waiting for unfinished jobs....
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+In file included from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_adc.h:38:0,
+                 from C:/Users/hqasemi/workspace/blinkx/StdPeriph_Driver/inc/stm32f4xx_conf.h:34,
+                 from ../src/stepmotor.c:12:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/device/stm32f4xx.h:122:3: error: #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+  #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   ^~~~~
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+<command-line>:0:1: error: macro names must be identifiers
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/stm32f4xx_it.h:27:0,
+                 from ../src/stm32f4xx_it.c:25:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/device/stm32f4xx.h:122:3: error: #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+  #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   ^~~~~
+make: *** [src/syscalls.o] Error 1
+src/subdir.mk:42: recipe for target 'src/syscalls.o' failed
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/defines.h:15:0,
+                 from C:/Users/hqasemi/workspace/blinkx/inc/stm32f4xx_it.h:28,
+                 from ../src/stm32f4xx_it.c:25:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/core/arm_math.h:306:4: error: #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+   #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+    ^~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/defines.h:15:0,
+                 from ../src/can.c:32:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/core/arm_math.h:306:4: error: #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+   #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+    ^~~~~
+../src/stm32f4xx_it.c: In function 'TIM1_BRK_TIM9_IRQHandler':
+../src/stm32f4xx_it.c:227:5: warning: implicit declaration of function 'TIM_GetITStatus' [-Wimplicit-function-declaration]
+  if(TIM_GetITStatus(TIM9, TIM_IT_Update) == SET)
+     ^~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:227:27: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM9, TIM_IT_Update) == SET)
+                           ^~~~~~~~~~~~~
+../src/stm32f4xx_it.c:227:27: note: each undeclared identifier is reported only once for each function it appears in
+../src/stm32f4xx_it.c:231:3: warning: implicit declaration of function 'TIM_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+   TIM_ClearITPendingBit(TIM9, TIM_IT_Update);
+   ^~~~~~~~~~~~~~~~~~~~~
+   NVIC_ClearPendingIRQ
+../src/can.c: In function 'CanInit':
+../src/can.c:98:4: error: unknown type name 'GPIO_InitTypeDef'; did you mean 'CAN_InitTypeDef'?
+    GPIO_InitTypeDef        GPIO_InitStructure;
+    ^~~~~~~~~~~~~~~~
+    CAN_InitTypeDef
+../src/stm32f4xx_it.c: In function 'TIM1_UP_TIM10_IRQHandler':
+../src/stm32f4xx_it.c:247:28: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM10, TIM_IT_Update) == SET)
+                            ^~~~~~~~~~~~~
+../src/can.c:101:4: error: unknown type name 'NVIC_InitTypeDef'; did you mean 'CAN_InitTypeDef'?
+    NVIC_InitTypeDef        NVIC_InitStructure;
+    ^~~~~~~~~~~~~~~~
+    CAN_InitTypeDef
+../src/can.c:134:22: error: request for member 'GPIO_Pin' in something not a structure or union
+    GPIO_InitStructure.GPIO_Pin = CAN_RX_PIN;
+                      ^
+In file included from ../src/can.c:41:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:594:24: error: 'GPIO_Pin_11' undeclared (first use in this function)
+ #define CAN_RX_PIN     GPIO_Pin_11 /* GPIO_Pin_8 */
+                        ^
+../src/can.c:134:34: note: in expansion of macro 'CAN_RX_PIN'
+    GPIO_InitStructure.GPIO_Pin = CAN_RX_PIN;
+                                  ^~~~~~~~~~
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:594:24: note: each undeclared identifier is reported only once for each function it appears in
+ #define CAN_RX_PIN     GPIO_Pin_11 /* GPIO_Pin_8 */
+                        ^
+../src/can.c:134:34: note: in expansion of macro 'CAN_RX_PIN'
+    GPIO_InitStructure.GPIO_Pin = CAN_RX_PIN;
+                                  ^~~~~~~~~~
+../src/can.c:135:22: error: request for member 'GPIO_Mode' in something not a structure or union
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+                      ^
+../src/can.c:135:35: error: 'GPIO_Mode_AF' undeclared (first use in this function); did you mean 'GPIO_Pin_11'?
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+                                   ^~~~~~~~~~~~
+                                   GPIO_Pin_11
+../src/can.c:136:22: error: request for member 'GPIO_Speed' in something not a structure or union
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+                      ^
+../src/stm32f4xx_it.c:250:6: warning: implicit declaration of function 'GPIO_ReadInputDataBit' [-Wimplicit-function-declaration]
+   if(GPIO_ReadInputDataBit(StepmotorHW[MOTOR_X].stepGPIO.port, StepmotorHW[MOTOR_X].stepGPIO.pin))
+      ^~~~~~~~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:252:4: warning: implicit declaration of function 'GPIO_ResetBits' [-Wimplicit-function-declaration]
+    GPIO_ResetBits(StepmotorHW[MOTOR_X].stepGPIO.port, StepmotorHW[MOTOR_X].stepGPIO.pin);
+    ^~~~~~~~~~~~~~
+../src/can.c:136:36: error: 'GPIO_Speed_50MHz' undeclared (first use in this function)
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+                                    ^~~~~~~~~~~~~~~~
+../src/can.c:137:22: error: request for member 'GPIO_OType' in something not a structure or union
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+                      ^
+../src/stm32f4xx_it.c:259:4: warning: implicit declaration of function 'GPIO_SetBits' [-Wimplicit-function-declaration]
+    GPIO_SetBits(StepmotorHW[MOTOR_X].stepGPIO.port, StepmotorHW[MOTOR_X].stepGPIO.pin);
+    ^~~~~~~~~~~~
+../src/stm32f4xx_it.c:265:4: warning: implicit declaration of function 'TIM_Cmd' [-Wimplicit-function-declaration]
+    TIM_Cmd(TIM10, DISABLE);
+    ^~~~~~~
+../src/can.c:137:36: error: 'GPIO_OType_OD' undeclared (first use in this function); did you mean 'GPIO_TypeDef'?
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+                                    ^~~~~~~~~~~~~
+                                    GPIO_TypeDef
+../src/can.c:138:22: error: request for member 'GPIO_PuPd' in something not a structure or union
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+                      ^
+../src/stm32f4xx_it.c: In function 'TIM1_TRG_COM_TIM11_IRQHandler':
+../src/stm32f4xx_it.c:295:29: error: 'TIM_IT_Update' undeclared (first use in this function)
+   if(TIM_GetITStatus(TIM11, TIM_IT_Update) == SET)
+                             ^~~~~~~~~~~~~
+../src/can.c:138:35: error: 'GPIO_PuPd_NOPULL' undeclared (first use in this function); did you mean 'GPIO_PUPDR_PUPDR0'?
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+                                   ^~~~~~~~~~~~~~~~
+                                   GPIO_PUPDR_PUPDR0
+../src/can.c:139:4: warning: implicit declaration of function 'GPIO_Init'; did you mean 'I2cInit'? [-Wimplicit-function-declaration]
+    GPIO_Init(CAN_GPIO_PORT, &GPIO_InitStructure);
+    ^~~~~~~~~
+    I2cInit
+../src/can.c:142:22: error: request for member 'GPIO_Pin' in something not a structure or union
+    GPIO_InitStructure.GPIO_Pin = CAN_TX_PIN;
+                      ^
+In file included from ../src/can.c:41:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:596:24: error: 'GPIO_Pin_12' undeclared (first use in this function); did you mean 'GPIO_Pin_11'?
+ #define CAN_TX_PIN     GPIO_Pin_12 /* GPIO_Pin_9 */
+                        ^
+../src/can.c:142:34: note: in expansion of macro 'CAN_TX_PIN'
+    GPIO_InitStructure.GPIO_Pin = CAN_TX_PIN;
+                                  ^~~~~~~~~~
+../src/can.c:143:22: error: request for member 'GPIO_Mode' in something not a structure or union
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+                      ^
+../src/can.c:144:22: error: request for member 'GPIO_Speed' in something not a structure or union
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+                      ^
+../src/can.c:145:22: error: request for member 'GPIO_OType' in something not a structure or union
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+                      ^
+../src/stm32f4xx_it.c: In function 'TIM8_BRK_TIM12_IRQHandler':
+../src/stm32f4xx_it.c:336:28: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM12, TIM_IT_Update) == SET)
+                            ^~~~~~~~~~~~~
+../src/can.c:145:36: error: 'GPIO_OType_PP' undeclared (first use in this function); did you mean 'GPIO_OType_OD'?
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+                                    ^~~~~~~~~~~~~
+                                    GPIO_OType_OD
+../src/can.c:146:22: error: request for member 'GPIO_PuPd' in something not a structure or union
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
+                      ^
+../src/stm32f4xx_it.c: In function 'TIM8_UP_TIM13_IRQHandler':
+../src/stm32f4xx_it.c:363:28: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM13, TIM_IT_Update) == SET)
+                            ^~~~~~~~~~~~~
+../src/can.c:150:4: warning: implicit declaration of function 'GPIO_PinAFConfig'; did you mean 'GPIOConfig'? [-Wimplicit-function-declaration]
+    GPIO_PinAFConfig(CAN_GPIO_PORT, CAN_RX_PIN_SOURCE, GPIO_AF_CAN1);
+    ^~~~~~~~~~~~~~~~
+    GPIOConfig
+../src/stm32f4xx_it.c: In function 'TIM4_IRQHandler':
+../src/stm32f4xx_it.c:384:27: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM4, TIM_IT_Update) == SET)
+                           ^~~~~~~~~~~~~
+In file included from ../src/can.c:41:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:595:29: error: 'GPIO_PinSource11' undeclared (first use in this function); did you mean 'GPIO_Pin_11'?
+ #define CAN_RX_PIN_SOURCE   GPIO_PinSource11 /* GPIO_PinSource8 */
+                             ^
+../src/can.c:150:36: note: in expansion of macro 'CAN_RX_PIN_SOURCE'
+    GPIO_PinAFConfig(CAN_GPIO_PORT, CAN_RX_PIN_SOURCE, GPIO_AF_CAN1);
+                                    ^~~~~~~~~~~~~~~~~
+../src/can.c:150:55: error: 'GPIO_AF_CAN1' undeclared (first use in this function); did you mean 'GPIOF_BASE'?
+    GPIO_PinAFConfig(CAN_GPIO_PORT, CAN_RX_PIN_SOURCE, GPIO_AF_CAN1);
+                                                       ^~~~~~~~~~~~
+                                                       GPIOF_BASE
+../src/stm32f4xx_it.c: In function 'TIM6_DAC_IRQHandler':
+../src/stm32f4xx_it.c:408:27: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM6, TIM_IT_Update) == SET)
+                           ^~~~~~~~~~~~~
+In file included from ../src/can.c:41:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:597:29: error: 'GPIO_PinSource12' undeclared (first use in this function); did you mean 'GPIO_PinSource11'?
+ #define CAN_TX_PIN_SOURCE   GPIO_PinSource12 /* GPIO_PinSource9 */
+                             ^
+../src/can.c:151:36: note: in expansion of macro 'CAN_TX_PIN_SOURCE'
+    GPIO_PinAFConfig(CAN_GPIO_PORT, CAN_TX_PIN_SOURCE, GPIO_AF_CAN1);
+                                    ^~~~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c: In function 'TIM7_IRQHandler':
+../src/stm32f4xx_it.c:428:27: error: 'TIM_IT_Update' undeclared (first use in this function)
+  if(TIM_GetITStatus(TIM7, TIM_IT_Update) == SET)
+                           ^~~~~~~~~~~~~
+../src/can.c:169:4: warning: implicit declaration of function 'NVIC_PriorityGroupConfig'; did you mean 'NVIC_GetPriorityGrouping'? [-Wimplicit-function-declaration]
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    ^~~~~~~~~~~~~~~~~~~~~~~~
+    NVIC_GetPriorityGrouping
+../src/stm32f4xx_it.c: In function 'TIM8_TRG_COM_TIM14_IRQHandler':
+../src/stm32f4xx_it.c:471:29: error: 'TIM_IT_Update' undeclared (first use in this function)
+   if(TIM_GetITStatus(TIM14, TIM_IT_Update) == SET)
+                             ^~~~~~~~~~~~~
+../src/can.c:169:29: error: 'NVIC_PriorityGroup_1' undeclared (first use in this function); did you mean 'NVIC_GetPriorityGrouping'?
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+                             ^~~~~~~~~~~~~~~~~~~~
+                             NVIC_GetPriorityGrouping
+../src/can.c:171:22: error: request for member 'NVIC_IRQChannel' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX0_IRQn;
+                      ^
+../src/stm32f4xx_it.c: In function 'ADC_IRQHandler':
+../src/stm32f4xx_it.c:486:5: warning: implicit declaration of function 'ADC_GetITStatus' [-Wimplicit-function-declaration]
+  if(ADC_GetITStatus(ADC1, ADC_IT_EOC) == SET)
+     ^~~~~~~~~~~~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/defines.h:15:0,
+                 from ../src/i2c.c:25:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/core/arm_math.h:306:4: error: #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+   #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+    ^~~~~
+../src/stm32f4xx_it.c:486:27: error: 'ADC_IT_EOC' undeclared (first use in this function); did you mean 'ADC_SR_EOC'?
+  if(ADC_GetITStatus(ADC1, ADC_IT_EOC) == SET)
+                           ^~~~~~~~~~
+                           ADC_SR_EOC
+../src/can.c:171:41: error: 'CAN1_RX0_IRQn' undeclared (first use in this function); did you mean 'CAN_MCR_INRQ'?
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX0_IRQn;
+                                         ^~~~~~~~~~~~~
+                                         CAN_MCR_INRQ
+../src/can.c:172:22: error: request for member 'NVIC_IRQChannelPreemptionPriority' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0;
+                      ^
+../src/can.c:173:22: error: request for member 'NVIC_IRQChannelSubPriority' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0;
+                      ^
+../src/can.c:174:22: error: request for member 'NVIC_IRQChannelCmd' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+                      ^
+../src/can.c:175:4: warning: implicit declaration of function 'NVIC_Init'; did you mean 'I2cInit'? [-Wimplicit-function-declaration]
+    NVIC_Init(&NVIC_InitStructure);
+    ^~~~~~~~~
+    I2cInit
+../src/can.c:177:22: error: request for member 'NVIC_IRQChannel' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX1_IRQn;
+                      ^
+../src/can.c:177:41: error: 'CAN1_RX1_IRQn' undeclared (first use in this function); did you mean 'CAN1_RX0_IRQn'?
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX1_IRQn;
+                                         ^~~~~~~~~~~~~
+                                         CAN1_RX0_IRQn
+../src/can.c:178:22: error: request for member 'NVIC_IRQChannelPreemptionPriority' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0;
+                      ^
+../src/can.c:179:22: error: request for member 'NVIC_IRQChannelSubPriority' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0;
+                      ^
+../src/can.c:180:22: error: request for member 'NVIC_IRQChannelCmd' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+                      ^
+../src/can.c:183:22: error: request for member 'NVIC_IRQChannel' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_TX_IRQn;
+                      ^
+../src/can.c:183:41: error: 'CAN1_TX_IRQn' undeclared (first use in this function); did you mean 'CAN1_RX1_IRQn'?
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_TX_IRQn;
+                                         ^~~~~~~~~~~~
+                                         CAN1_RX1_IRQn
+../src/can.c:184:22: error: request for member 'NVIC_IRQChannelPreemptionPriority' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0;
+                      ^
+../src/can.c:185:22: error: request for member 'NVIC_IRQChannelSubPriority' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0;
+                      ^
+../src/can.c:186:22: error: request for member 'NVIC_IRQChannelCmd' in something not a structure or union
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+                      ^
+../src/stm32f4xx_it.c:491:3: warning: implicit declaration of function 'ADC_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+   ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
+   ^~~~~~~~~~~~~~~~~~~~~
+   NVIC_ClearPendingIRQ
+../src/can.c: In function 'CanDecode':
+../src/can.c:481:7: warning: unused variable 'strtemp' [-Wunused-variable]
+  char strtemp[40];
+       ^~~~~~~
+../src/can.c:480:7: warning: unused variable 'str' [-Wunused-variable]
+  char str[40];
+       ^~~
+../src/can.c:477:15: warning: unused variable 'sen' [-Wunused-variable]
+  uint8_t mot, sen, i, exposure;
+               ^~~
+../src/i2c.c: In function 'I2cTMP275SetTemperatureRegister':
+../src/i2c.c:581:10: warning: unused variable 'dat' [-Wunused-variable]
+  uint8_t dat;
+          ^~~
+../src/i2c.c: In function 'I2cReadEepromAscii':
+../src/i2c.c:766:10: warning: unused variable 'data' [-Wunused-variable]
+  int32_t data;
+          ^~~~
+../src/i2c.c: In function 'I2cReadEepromExtAscii':
+../src/i2c.c:808:10: warning: unused variable 'data' [-Wunused-variable]
+  int32_t data;
+          ^~~~
+../src/i2c.c: In function 'I2cReadLTC2481':
+../src/i2c.c:1174:10: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  uint8_t ret;
+          ^~~
+../src/i2c.c: In function 'IsI2cLTC2481Present':
+../src/i2c.c:1211:12: warning: variable 'v' set but not used [-Wunused-but-set-variable]
+  uint8_t u,v, adr;
+            ^
+../src/i2c.c: In function 'IsI2cLTC2943Present':
+../src/i2c.c:1302:12: warning: variable 'v' set but not used [-Wunused-but-set-variable]
+  uint8_t u,v;
+            ^
+../src/i2c.c: In function 'IsI2cLM35091Present':
+../src/i2c.c:1561:12: warning: variable 'v' set but not used [-Wunused-but-set-variable]
+  uint8_t u,v, adr;
+            ^
+../src/i2c.c: In function 'I2cINA236SetRegisterPointer':
+../src/i2c.c:1706:16: warning: unused variable 'datl' [-Wunused-variable]
+  uint8_t dath, datl;
+                ^~~~
+../src/i2c.c:1706:10: warning: unused variable 'dath' [-Wunused-variable]
+  uint8_t dath, datl;
+          ^~~~
+../src/i2c.c: In function 'I2cReadINA236':
+../src/i2c.c:1735:10: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  uint8_t ret;
+          ^~~
+../src/i2c.c: In function 'I2cReadLTC2471':
+../src/i2c.c:1773:15: warning: variable 'stat' set but not used [-Wunused-but-set-variable]
+  uint8_t adr, stat;
+               ^~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/main.h:14:0,
+                 from ../src/exposure.c:21:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/core/arm_math.h:306:4: error: #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+   #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+    ^~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/defines.h:15:0,
+                 from ../src/main.c:25:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/core/arm_math.h:306:4: error: #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+   #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+    ^~~~~
+../src/stm32f4xx_it.c: In function 'EXTI0_IRQHandler':
+../src/stm32f4xx_it.c:520:6: warning: implicit declaration of function 'EXTI_GetITStatus' [-Wimplicit-function-declaration]
+   if(EXTI_GetITStatus(EXTI_Line0) != RESET)
+      ^~~~~~~~~~~~~~~~
+In file included from C:/Users/hqasemi/workspace/blinkx/inc/defines.h:15:0,
+                 from ../src/stepmotor.c:20:
+C:/Users/hqasemi/workspace/blinkx/CMSIS/core/arm_math.h:306:4: error: #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+   #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
+    ^~~~~
+../src/stm32f4xx_it.c:520:23: error: 'EXTI_Line0' undeclared (first use in this function); did you mean 'EXTI_BASE'?
+   if(EXTI_GetITStatus(EXTI_Line0) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_BASE
+In file included from ../src/exposure.c:22:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:633:56: error: unknown type name 'CanRxMsg'
+ void CanReceive(CAN_TypeDef* CANx, uint8_t FIFONumber, CanRxMsg* pmsg);
+                                                        ^~~~~~~~
+../src/stm32f4xx_it.c:526:5: warning: implicit declaration of function 'EXTI_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+     EXTI_ClearITPendingBit(EXTI_Line0);
+     ^~~~~~~~~~~~~~~~~~~~~~
+     NVIC_ClearPendingIRQ
+In file included from ../src/main.c:36:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:633:56: error: unknown type name 'CanRxMsg'
+ void CanReceive(CAN_TypeDef* CANx, uint8_t FIFONumber, CanRxMsg* pmsg);
+                                                        ^~~~~~~~
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:634:16: error: unknown type name 'CanRxMsg'
+ void CanDecode(CanRxMsg *msg);
+                ^~~~~~~~
+make: *** [src/can.o] Error 1
+src/subdir.mk:42: recipe for target 'src/can.o' failed
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:634:16: error: unknown type name 'CanRxMsg'
+ void CanDecode(CanRxMsg *msg);
+                ^~~~~~~~
+../src/stm32f4xx_it.c: In function 'EXTI1_IRQHandler':
+../src/stm32f4xx_it.c:535:23: error: 'EXTI_Line1' undeclared (first use in this function); did you mean 'EXTI_BASE'?
+   if(EXTI_GetITStatus(EXTI_Line1) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_BASE
+In file included from ../src/stepmotor.c:22:0:
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:633:56: error: unknown type name 'CanRxMsg'
+ void CanReceive(CAN_TypeDef* CANx, uint8_t FIFONumber, CanRxMsg* pmsg);
+                                                        ^~~~~~~~
+src/subdir.mk:42: recipe for target 'src/i2c.o' failed
+make: *** [src/i2c.o] Error 1
+C:/Users/hqasemi/workspace/blinkx/inc/can.h:634:16: error: unknown type name 'CanRxMsg'
+ void CanDecode(CanRxMsg *msg);
+                ^~~~~~~~
+../src/exposure.c: In function 'ExposureInit':
+../src/exposure.c:56:4: error: unknown type name 'DAC_InitTypeDef'; did you mean 'RTC_InitTypeDef'?
+    DAC_InitTypeDef  DAC_InitStructure;
+    ^~~~~~~~~~~~~~~
+    RTC_InitTypeDef
+../src/stm32f4xx_it.c: In function 'EXTI3_IRQHandler':
+../src/stm32f4xx_it.c:555:23: error: 'EXTI_Line3' undeclared (first use in this function); did you mean 'EXTI_BASE'?
+   if(EXTI_GetITStatus(EXTI_Line3) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_BASE
+../src/main.c: In function 'main':
+../src/stm32f4xx_it.c: In function 'EXTI9_5_IRQHandler':
+../src/stm32f4xx_it.c:580:23: error: 'EXTI_Line5' undeclared (first use in this function); did you mean 'EXTI_BASE'?
+   if(EXTI_GetITStatus(EXTI_Line5) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_BASE
+In file included from ../src/exposure.c:25:0:
+C:/Users/hqasemi/workspace/blinkx/inc/exposure.h:42:40: error: 'DAC_Channel_1' undeclared (first use in this function); did you mean 'ADC_Channel_1'?
+ #define EXPOSURE_DAC_A_CHANNEL         DAC_Channel_1
+                                        ^
+../src/exposure.c:81:40: note: in expansion of macro 'EXPOSURE_DAC_A_CHANNEL'
+    ExposureHW[EXPOSURE_A].dacChannel = EXPOSURE_DAC_A_CHANNEL;
+                                        ^~~~~~~~~~~~~~~~~~~~~~
+C:/Users/hqasemi/workspace/blinkx/inc/exposure.h:42:40: note: each undeclared identifier is reported only once for each function it appears in
+ #define EXPOSURE_DAC_A_CHANNEL         DAC_Channel_1
+                                        ^
+../src/exposure.c:81:40: note: in expansion of macro 'EXPOSURE_DAC_A_CHANNEL'
+    ExposureHW[EXPOSURE_A].dacChannel = EXPOSURE_DAC_A_CHANNEL;
+                                        ^~~~~~~~~~~~~~~~~~~~~~
+In file included from ../src/stm32f4xx_it.c:33:0:
+C:/Users/hqasemi/workspace/blinkx/inc/stepmotor.h:131:34: error: 'GPIO_Pin_4' undeclared (first use in this function)
+ #define STEPMOTOR_X_ENCA_PIN     GPIO_Pin_4
+                                  ^
+../src/stm32f4xx_it.c:586:61: note: in expansion of macro 'STEPMOTOR_X_ENCA_PIN'
+    leva = GPIO_ReadInputDataBit(STEPMOTOR_X_ENCA_GPIO_PORT, STEPMOTOR_X_ENCA_PIN);
+                                                             ^~~~~~~~~~~~~~~~~~~~
+C:/Users/hqasemi/workspace/blinkx/inc/stepmotor.h:134:34: error: 'GPIO_Pin_5' undeclared (first use in this function); did you mean 'GPIO_Pin_4'?
+ #define STEPMOTOR_X_ENCB_PIN     GPIO_Pin_5
+                                  ^
+../src/stm32f4xx_it.c:587:61: note: in expansion of macro 'STEPMOTOR_X_ENCB_PIN'
+    levb = GPIO_ReadInputDataBit(STEPMOTOR_X_ENCB_GPIO_PORT, STEPMOTOR_X_ENCB_PIN);
+                                                             ^~~~~~~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:625:23: error: 'EXTI_Line7' undeclared (first use in this function); did you mean 'EXTI_Line5'?
+   if(EXTI_GetITStatus(EXTI_Line7) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_Line5
+In file included from ../src/stm32f4xx_it.c:33:0:
+C:/Users/hqasemi/workspace/blinkx/inc/stepmotor.h:161:34: error: 'GPIO_Pin_6' undeclared (first use in this function); did you mean 'GPIO_Pin_5'?
+ #define STEPMOTOR_Y_ENCA_PIN     GPIO_Pin_6 //Disc Encoder
+                                  ^
+../src/stm32f4xx_it.c:631:61: note: in expansion of macro 'STEPMOTOR_Y_ENCA_PIN'
+    leva = GPIO_ReadInputDataBit(STEPMOTOR_Y_ENCA_GPIO_PORT, STEPMOTOR_Y_ENCA_PIN);
+                                                             ^~~~~~~~~~~~~~~~~~~~
+../src/main.c:385:4: warning: implicit declaration of function 'my_main'; did you mean 'main'? [-Wimplicit-function-declaration]
+    my_main();
+    ^~~~~~~
+    main
+C:/Users/hqasemi/workspace/blinkx/inc/stepmotor.h:164:34: error: 'GPIO_Pin_7' undeclared (first use in this function); did you mean 'GPIO_Pin_6'?
+ #define STEPMOTOR_Y_ENCB_PIN     GPIO_Pin_7 //Disc Encoder
+                                  ^
+../src/stm32f4xx_it.c:632:61: note: in expansion of macro 'STEPMOTOR_Y_ENCB_PIN'
+    levb = GPIO_ReadInputDataBit(STEPMOTOR_Y_ENCB_GPIO_PORT, STEPMOTOR_Y_ENCB_PIN);
+                                                             ^~~~~~~~~~~~~~~~~~~~
+../src/main.c:160:10: warning: unused variable 'it' [-Wunused-variable]
+  uint8_t it;
+          ^~
+../src/stm32f4xx_it.c:670:23: error: 'EXTI_Line8' undeclared (first use in this function); did you mean 'EXTI_Line7'?
+   if(EXTI_GetITStatus(EXTI_Line8) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_Line7
+../src/exposure.c:91:4: warning: implicit declaration of function 'DAC_StructInit'; did you mean 'RTC_StructInit'? [-Wimplicit-function-declaration]
+    DAC_StructInit(&DAC_InitStructure);
+    ^~~~~~~~~~~~~~
+    RTC_StructInit
+../src/exposure.c:126:22: error: request for member 'DAC_Trigger' in something not a structure or union
+     DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
+                      ^
+../src/stm32f4xx_it.c:680:23: error: 'EXTI_Line9' undeclared (first use in this function); did you mean 'EXTI_Line8'?
+   if(EXTI_GetITStatus(EXTI_Line9) != RESET)
+                       ^~~~~~~~~~
+                       EXTI_Line8
+../src/stepmotor.c: In function 'StepmotorInit':
+../src/stepmotor.c:223:41: error: 'TIM1_UP_TIM10_IRQn' undeclared (first use in this function); did you mean 'TAMP_STAMP_IRQn'?
+    NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_TIM10_IRQn;
+                                         ^~~~~~~~~~~~~~~~~~
+                                         TAMP_STAMP_IRQn
+../src/stepmotor.c:223:41: note: each undeclared identifier is reported only once for each function it appears in
+../src/stm32f4xx_it.c: In function 'EXTI15_10_IRQHandler':
+../src/stm32f4xx_it.c:702:22: error: 'EXTI_Line11' undeclared (first use in this function); did you mean 'EXTI_PR_PR11'?
+  if(EXTI_GetITStatus(EXTI_Line11) != RESET)
+                      ^~~~~~~~~~~
+                      EXTI_PR_PR11
+../src/stm32f4xx_it.c:712:22: error: 'EXTI_Line13' undeclared (first use in this function); did you mean 'EXTI_Line11'?
+  if(EXTI_GetITStatus(EXTI_Line13) != RESET)
+                      ^~~~~~~~~~~
+                      EXTI_Line11
+../src/main.c: In function 'SetDacValue':
+../src/main.c:620:19: error: 'DAC_Channel_1' undeclared (first use in this function); did you mean 'ADC_Channel_1'?
+     if(channel == DAC_Channel_1)
+                   ^~~~~~~~~~~~~
+                   ADC_Channel_1
+../src/main.c:620:19: note: each undeclared identifier is reported only once for each function it appears in
+../src/exposure.c:126:37: error: 'DAC_Trigger_None' undeclared (first use in this function); did you mean 'EXTI_Trigger_Rising'?
+     DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
+                                     ^~~~~~~~~~~~~~~~
+                                     EXTI_Trigger_Rising
+../src/exposure.c:127:22: error: request for member 'DAC_WaveGeneration' in something not a structure or union
+     DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
+                      ^
+../src/stepmotor.c:229:41: error: 'TIM1_TRG_COM_TIM11_IRQn' undeclared (first use in this function); did you mean 'TIM1_UP_TIM10_IRQn'?
+    NVIC_InitStructure.NVIC_IRQChannel = TIM1_TRG_COM_TIM11_IRQn;
+                                         ^~~~~~~~~~~~~~~~~~~~~~~
+                                         TIM1_UP_TIM10_IRQn
+../src/stm32f4xx_it.c: In function 'SPI2_IRQHandler':
+../src/stm32f4xx_it.c:729:5: warning: implicit declaration of function 'SPI_I2S_GetITStatus'; did you mean 'SPI_I2SCFGR_I2SSTD_1'? [-Wimplicit-function-declaration]
+  if(SPI_I2S_GetITStatus(SPI2, SPI_I2S_IT_TXE) != RESET)
+     ^~~~~~~~~~~~~~~~~~~
+     SPI_I2SCFGR_I2SSTD_1
+In file included from ../src/stepmotor.c:26:0:
+C:/Users/hqasemi/workspace/blinkx/inc/stepmotor.h:138:34: error: 'EXTI9_5_IRQn' undeclared (first use in this function); did you mean 'EXTI4_IRQn'?
+ #define STEPMOTOR_X_ENCB_IRQ     EXTI9_5_IRQn
+                                  ^
+../src/stepmotor.c:264:41: note: in expansion of macro 'STEPMOTOR_X_ENCB_IRQ'
+    NVIC_InitStructure.NVIC_IRQChannel = STEPMOTOR_X_ENCB_IRQ | STEPMOTOR_Y_ENCB_IRQ;
+                                         ^~~~~~~~~~~~~~~~~~~~
+../src/stepmotor.c: In function 'StepmotorSetMicrostepConfig':
+../src/stepmotor.c:1101:10: warning: variable 'oldmscount' set but not used [-Wunused-but-set-variable]
+  uint8_t oldmscount = 1;
+          ^~~~~~~~~~
+../src/stm32f4xx_it.c:729:31: error: 'SPI_I2S_IT_TXE' undeclared (first use in this function); did you mean 'SPI_SR_TXE'?
+  if(SPI_I2S_GetITStatus(SPI2, SPI_I2S_IT_TXE) != RESET)
+                               ^~~~~~~~~~~~~~
+                               SPI_SR_TXE
+../src/main.c:622:6: warning: implicit declaration of function 'DAC_SetChannel1Data'; did you mean 'ADC_Channel_Vbat'? [-Wimplicit-function-declaration]
+      DAC_SetChannel1Data(DAC_Align_12b_R, val);
+      ^~~~~~~~~~~~~~~~~~~
+      ADC_Channel_Vbat
+../src/exposure.c:127:44: error: 'DAC_WaveGeneration_None' undeclared (first use in this function)
+     DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
+                                            ^~~~~~~~~~~~~~~~~~~~~~~
+../src/exposure.c:128:22: error: request for member 'DAC_OutputBuffer' in something not a structure or union
+     DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
+                      ^
+../src/main.c:622:26: error: 'DAC_Align_12b_R' undeclared (first use in this function)
+      DAC_SetChannel1Data(DAC_Align_12b_R, val);
+                          ^~~~~~~~~~~~~~~
+../src/main.c:624:19: error: 'DAC_Channel_2' undeclared (first use in this function); did you mean 'DAC_Channel_1'?
+     if(channel == DAC_Channel_2)
+                   ^~~~~~~~~~~~~
+                   DAC_Channel_1
+../src/exposure.c:128:42: error: 'DAC_OutputBuffer_Enable' undeclared (first use in this function); did you mean 'TIM_OutputState_Enable'?
+     DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
+                                          ^~~~~~~~~~~~~~~~~~~~~~~
+                                          TIM_OutputState_Enable
+src/subdir.mk:42: recipe for target 'src/stepmotor.o' failed
+make: *** [src/stepmotor.o] Error 1
+../src/exposure.c:129:5: warning: implicit declaration of function 'DAC_Init'; did you mean 'RTC_Init'? [-Wimplicit-function-declaration]
+     DAC_Init(ExposureHW[i].dacChannel, &DAC_InitStructure);
+     ^~~~~~~~
+     RTC_Init
+../src/exposure.c:131:5: warning: implicit declaration of function 'DAC_Cmd'; did you mean 'I2C_Cmd'? [-Wimplicit-function-declaration]
+     DAC_Cmd(ExposureHW[i].dacChannel, ENABLE);
+     ^~~~~~~
+     I2C_Cmd
+../src/stm32f4xx_it.c:734:4: warning: implicit declaration of function 'SPI_I2S_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+    SPI_I2S_ClearITPendingBit(SPI2, SPI_I2S_IT_TXE);
+    ^~~~~~~~~~~~~~~~~~~~~~~~~
+    NVIC_ClearPendingIRQ
+../src/main.c:626:6: warning: implicit declaration of function 'DAC_SetChannel2Data'; did you mean 'ADC_Channel_Vbat'? [-Wimplicit-function-declaration]
+      DAC_SetChannel2Data(DAC_Align_12b_R, val);
+      ^~~~~~~~~~~~~~~~~~~
+      ADC_Channel_Vbat
+../src/stm32f4xx_it.c:738:31: error: 'SPI_I2S_IT_RXNE' undeclared (first use in this function); did you mean 'SPI_I2S_IT_TXE'?
+  if(SPI_I2S_GetITStatus(SPI2, SPI_I2S_IT_RXNE) != RESET)
+                               ^~~~~~~~~~~~~~~
+                               SPI_I2S_IT_TXE
+In file included from ../src/main.c:26:0:
+../src/main.c: In function 'SystemTimerConfig':
+C:/Users/hqasemi/workspace/blinkx/inc/main.h:136:45: error: 'TIM7_IRQn' undeclared (first use in this function); did you mean 'ADC_IRQn'?
+ #define SYSTEM_TIMER_IRQ_CHANNEL            TIM7_IRQn // TIM6_DAC_IRQn
+                                             ^
+../src/main.c:1048:41: note: in expansion of macro 'SYSTEM_TIMER_IRQ_CHANNEL'
+    NVIC_InitStructure.NVIC_IRQChannel = SYSTEM_TIMER_IRQ_CHANNEL;//TIM6_DAC_IRQn;
+                                         ^~~~~~~~~~~~~~~~~~~~~~~~
+../src/main.c: In function 'Decoder':
+../src/main.c:3163:69: warning: passing argument 3 of 'I2cReadEepromExtAscii' from incompatible pointer type [-Wincompatible-pointer-types]
+              I2cReadEepromExtAscii(EEPROM_EXT_ADDRESS_OPTIC_TYP, 4, &type );
+                                                                     ^
+../src/stm32f4xx_it.c: In function 'SPI3_IRQHandler':
+../src/stm32f4xx_it.c:753:32: error: 'SPI_I2S_IT_TXE' undeclared (first use in this function); did you mean 'SPI_SR_TXE'?
+   if(SPI_I2S_GetITStatus(SPI3, SPI_I2S_IT_TXE) != RESET)
+                                ^~~~~~~~~~~~~~
+                                SPI_SR_TXE
+In file included from ../src/main.c:35:0:
+C:/Users/hqasemi/workspace/blinkx/inc/i2c.h:145:6: note: expected 'uint8_t * {aka unsigned char *}' but argument is of type 'uint8_t (*)[10] {aka unsigned char (*)[10]}'
+ void I2cReadEepromExtAscii(uint16_t address, uint8_t len, uint8_t * buf);
+      ^~~~~~~~~~~~~~~~~~~~~
+../src/main.c:3165:30: warning: pointer targets in passing argument 2 of 'strcat' differ in signedness [-Wpointer-sign]
+              strcat(strTemp, type);
+                              ^~~~
+In file included from ../src/main.c:23:0:
+c:\ac6\systemworkbench\plugins\fr.ac6.mcu.externaltools.arm-none.win32_1.17.0.201812190825\tools\compiler\arm-none-eabi\include\string.h:34:8: note: expected 'const char * restrict' but argument is of type 'uint8_t * {aka unsigned char *}'
+ char  *strcat (char *__restrict, const char *__restrict);
+        ^~~~~~
+../src/main.c:1183:14: warning: unused variable 'f' [-Wunused-variable]
+    float32_t f;
+              ^
+../src/main.c:1182:21: warning: unused variable 'len' [-Wunused-variable]
+    uint8_t mot, uc, len;
+                     ^~~
+../src/main.c:1182:17: warning: unused variable 'uc' [-Wunused-variable]
+    uint8_t mot, uc, len;
+                 ^~
+../src/stm32f4xx_it.c:761:32: error: 'SPI_I2S_IT_RXNE' undeclared (first use in this function); did you mean 'SPI_I2S_IT_TXE'?
+   if(SPI_I2S_GetITStatus(SPI3, SPI_I2S_IT_RXNE) != RESET)
+                                ^~~~~~~~~~~~~~~
+                                SPI_I2S_IT_TXE
+../src/exposure.c:185:6: warning: implicit declaration of function 'DAC_SetChannel1Data'; did you mean 'ADC_Channel_Vbat'? [-Wimplicit-function-declaration]
+      DAC_SetChannel1Data(DAC_Align_12b_R, 0);
+      ^~~~~~~~~~~~~~~~~~~
+      ADC_Channel_Vbat
+../src/main.c: In function 'WorkSendLogData':
+../src/main.c:3248:7: warning: unused variable 'ch' [-Wunused-variable]
+  char ch = ' ';
+       ^~
+../src/main.c: In function 'StopScriptAndPeltierOff':
+../src/main.c:5292:6: warning: unused variable 'i' [-Wunused-variable]
+  int i;
+      ^
+../src/main.c: In function 'DebugInitTimer1':
+../src/main.c:5466:13: warning: unused variable 'Prescalerval' [-Wunused-variable]
+    uint16_t Prescalerval;
+             ^~~~~~~~~~~~
+../src/stm32f4xx_it.c: In function 'USART1_IRQHandler':
+../src/stm32f4xx_it.c:782:6: warning: implicit declaration of function 'USART_GetITStatus' [-Wimplicit-function-declaration]
+   if(USART_GetITStatus(USART1, USART_IT_TXE) == SET)
+      ^~~~~~~~~~~~~~~~~
+../src/exposure.c:185:26: error: 'DAC_Align_12b_R' undeclared (first use in this function)
+      DAC_SetChannel1Data(DAC_Align_12b_R, 0);
+                          ^~~~~~~~~~~~~~~
+../src/exposure.c:187:36: error: 'DAC_Channel_2' undeclared (first use in this function); did you mean 'DAC_Channel_1'?
+     if(ExposureHW[i].dacChannel == DAC_Channel_2)
+                                    ^~~~~~~~~~~~~
+                                    DAC_Channel_1
+../src/stm32f4xx_it.c:782:32: error: 'USART_IT_TXE' undeclared (first use in this function); did you mean 'USART_SR_TXE'?
+   if(USART_GetITStatus(USART1, USART_IT_TXE) == SET)
+                                ^~~~~~~~~~~~
+                                USART_SR_TXE
+../src/stm32f4xx_it.c:794:8: warning: implicit declaration of function 'USART_ITConfig'; did you mean 'ADCConfig'? [-Wimplicit-function-declaration]
+        USART_ITConfig(USART1, USART_IT_TXE, DISABLE);
+        ^~~~~~~~~~~~~~
+        ADCConfig
+../src/exposure.c:189:6: warning: implicit declaration of function 'DAC_SetChannel2Data'; did you mean 'ADC_Channel_Vbat'? [-Wimplicit-function-declaration]
+      DAC_SetChannel2Data(DAC_Align_12b_R, 0);
+      ^~~~~~~~~~~~~~~~~~~
+      ADC_Channel_Vbat
+../src/exposure.c:280:3: warning: implicit declaration of function 'Delayms' [-Wimplicit-function-declaration]
+   Delayms(10);
+   ^~~~~~~
+../src/exposure.c:66:13: warning: unused variable 'utemp' [-Wunused-variable]
+    uint32_t utemp;
+             ^~~~~
+../src/exposure.c:64:12: warning: unused variable 'itemp' [-Wunused-variable]
+    int32_t itemp;
+            ^~~~~
+../src/stm32f4xx_it.c:800:7: warning: implicit declaration of function 'USART_SendData'; did you mean 'USART_SR_IDLE'? [-Wimplicit-function-declaration]
+       USART_SendData(USART1, UartPc_TX_Buffer[UartPc_TX_Pos]);
+       ^~~~~~~~~~~~~~
+       USART_SR_IDLE
+make: *** [src/main.o] Error 1
+src/subdir.mk:42: recipe for target 'src/main.o' failed
+../src/exposure.c: In function 'SwitchExposureOn':
+../src/exposure.c:323:38: error: 'DAC_Channel_1' undeclared (first use in this function); did you mean 'ADC_Channel_1'?
+    if(ExposureHW[port].dacChannel == DAC_Channel_1)
+                                      ^~~~~~~~~~~~~
+                                      ADC_Channel_1
+../src/stm32f4xx_it.c:805:6: warning: implicit declaration of function 'USART_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+      USART_ClearITPendingBit(USART1, USART_IT_TXE);
+      ^~~~~~~~~~~~~~~~~~~~~~~
+      NVIC_ClearPendingIRQ
+../src/stm32f4xx_it.c:808:32: error: 'USART_IT_RXNE' undeclared (first use in this function); did you mean 'USART_IT_TXE'?
+   if(USART_GetITStatus(USART1, USART_IT_RXNE) == SET)
+                                ^~~~~~~~~~~~~
+                                USART_IT_TXE
+../src/exposure.c:325:25: error: 'DAC_Align_12b_R' undeclared (first use in this function)
+     DAC_SetChannel1Data(DAC_Align_12b_R, (uint16_t)dac);
+                         ^~~~~~~~~~~~~~~
+../src/exposure.c:327:38: error: 'DAC_Channel_2' undeclared (first use in this function); did you mean 'DAC_Channel_1'?
+    if(ExposureHW[port].dacChannel == DAC_Channel_2)
+                                      ^~~~~~~~~~~~~
+                                      DAC_Channel_1
+../src/exposure.c: In function 'SwitchExposureOff':
+../src/exposure.c:365:38: error: 'DAC_Channel_1' undeclared (first use in this function); did you mean 'ADC_Channel_1'?
+    if(ExposureHW[port].dacChannel == DAC_Channel_1)
+                                      ^~~~~~~~~~~~~
+                                      ADC_Channel_1
+../src/stm32f4xx_it.c:810:11: warning: implicit declaration of function 'USART_ReceiveData' [-Wimplicit-function-declaration]
+     dat = USART_ReceiveData(USART1);
+           ^~~~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c: In function 'USART2_IRQHandler':
+../src/stm32f4xx_it.c:853:31: error: 'USART_IT_TXE' undeclared (first use in this function); did you mean 'USART_SR_TXE'?
+  if(USART_GetITStatus(USART2, USART_IT_TXE) == SET)
+                               ^~~~~~~~~~~~
+                               USART_SR_TXE
+../src/stm32f4xx_it.c:861:31: error: 'USART_IT_RXNE' undeclared (first use in this function); did you mean 'USART_IT_TXE'?
+  if(USART_GetITStatus(USART2, USART_IT_RXNE) == SET)
+                               ^~~~~~~~~~~~~
+                               USART_IT_TXE
+../src/stm32f4xx_it.c: In function 'USART3_IRQHandler':
+../src/stm32f4xx_it.c:884:32: error: 'USART_IT_TXE' undeclared (first use in this function); did you mean 'USART_SR_TXE'?
+   if(USART_GetITStatus(USART3, USART_IT_TXE) == SET)
+                                ^~~~~~~~~~~~
+                                USART_SR_TXE
+../src/exposure.c:367:25: error: 'DAC_Align_12b_R' undeclared (first use in this function)
+     DAC_SetChannel1Data(DAC_Align_12b_R, 0);
+                         ^~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:891:32: error: 'USART_IT_RXNE' undeclared (first use in this function); did you mean 'USART_IT_TXE'?
+   if(USART_GetITStatus(USART3, USART_IT_RXNE) == SET)
+                                ^~~~~~~~~~~~~
+                                USART_IT_TXE
+../src/exposure.c:369:38: error: 'DAC_Channel_2' undeclared (first use in this function); did you mean 'DAC_Channel_1'?
+    if(ExposureHW[port].dacChannel == DAC_Channel_2)
+                                      ^~~~~~~~~~~~~
+                                      DAC_Channel_1
+../src/stm32f4xx_it.c: In function 'USART6_IRQHandler':
+../src/stm32f4xx_it.c:917:32: error: 'USART_IT_TXE' undeclared (first use in this function); did you mean 'USART_SR_TXE'?
+   if(USART_GetITStatus(USART6, USART_IT_TXE) == SET)
+                                ^~~~~~~~~~~~
+                                USART_SR_TXE
+../src/exposure.c: In function 'ExposureSetCurrent':
+../src/exposure.c:644:38: error: 'DAC_Channel_1' undeclared (first use in this function); did you mean 'ADC_Channel_1'?
+    if(ExposureHW[port].dacChannel == DAC_Channel_1)
+                                      ^~~~~~~~~~~~~
+                                      ADC_Channel_1
+../src/stm32f4xx_it.c:926:32: error: 'USART_IT_RXNE' undeclared (first use in this function); did you mean 'USART_IT_TXE'?
+   if(USART_GetITStatus(USART6, USART_IT_RXNE) == SET)
+                                ^~~~~~~~~~~~~
+                                USART_IT_TXE
+../src/stm32f4xx_it.c: In function 'I2C2_EV_IRQHandler':
+../src/stm32f4xx_it.c:941:6: warning: implicit declaration of function 'I2C_GetITStatus' [-Wimplicit-function-declaration]
+   if(I2C_GetITStatus(I2C2, I2C_IT_EVT) != RESET)
+      ^~~~~~~~~~~~~~~
+../src/exposure.c:646:25: error: 'DAC_Align_12b_R' undeclared (first use in this function)
+     DAC_SetChannel1Data(DAC_Align_12b_R, (uint16_t)dac);
+                         ^~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:941:28: error: 'I2C_IT_EVT' undeclared (first use in this function); did you mean 'I2C_SR1_OVR'?
+   if(I2C_GetITStatus(I2C2, I2C_IT_EVT) != RESET)
+                            ^~~~~~~~~~
+                            I2C_SR1_OVR
+../src/exposure.c:648:38: error: 'DAC_Channel_2' undeclared (first use in this function); did you mean 'DAC_Channel_1'?
+    if(ExposureHW[port].dacChannel == DAC_Channel_2)
+                                      ^~~~~~~~~~~~~
+                                      DAC_Channel_1
+../src/exposure.c: In function 'SwitchExposureRegulatedPowerOn':
+../src/exposure.c:1058:39: error: 'DAC_Channel_1' undeclared (first use in this function); did you mean 'ADC_Channel_1'?
+     if(ExposureHW[port].dacChannel == DAC_Channel_1)
+                                       ^~~~~~~~~~~~~
+                                       ADC_Channel_1
+../src/stm32f4xx_it.c:943:11: warning: implicit declaration of function 'I2C_GetLastEvent' [-Wimplicit-function-declaration]
+    switch(I2C_GetLastEvent(I2C2))
+           ^~~~~~~~~~~~~~~~
+../src/exposure.c:1060:26: error: 'DAC_Align_12b_R' undeclared (first use in this function)
+      DAC_SetChannel1Data(DAC_Align_12b_R, (uint16_t)dac);
+                          ^~~~~~~~~~~~~~~
+../src/exposure.c:1062:39: error: 'DAC_Channel_2' undeclared (first use in this function); did you mean 'DAC_Channel_1'?
+     if(ExposureHW[port].dacChannel == DAC_Channel_2)
+                                       ^~~~~~~~~~~~~
+                                       DAC_Channel_1
+../src/stm32f4xx_it.c:945:10: error: 'I2C_EVENT_MASTER_MODE_SELECT' undeclared (first use in this function)
+     case I2C_EVENT_MASTER_MODE_SELECT:
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:947:10: error: 'I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED' undeclared (first use in this function); did you mean 'I2C_EVENT_MASTER_MODE_SELECT'?
+     case I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED:
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          I2C_EVENT_MASTER_MODE_SELECT
+../src/stm32f4xx_it.c:949:10: error: 'I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED' undeclared (first use in this function); did you mean 'I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED'?
+     case I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED:
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED
+src/subdir.mk:42: recipe for target 'src/exposure.o' failed
+make: *** [src/exposure.o] Error 1
+../src/stm32f4xx_it.c:951:10: error: 'I2C_EVENT_MASTER_BYTE_TRANSMITTING' undeclared (first use in this function); did you mean 'I2C_EVENT_MASTER_MODE_SELECT'?
+     case I2C_EVENT_MASTER_BYTE_TRANSMITTING:
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          I2C_EVENT_MASTER_MODE_SELECT
+../src/stm32f4xx_it.c:953:10: error: 'I2C_EVENT_MASTER_BYTE_TRANSMITTED' undeclared (first use in this function); did you mean 'I2C_EVENT_MASTER_BYTE_TRANSMITTING'?
+     case I2C_EVENT_MASTER_BYTE_TRANSMITTED:
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          I2C_EVENT_MASTER_BYTE_TRANSMITTING
+../src/stm32f4xx_it.c:955:10: error: 'I2C_EVENT_MASTER_BYTE_RECEIVED' undeclared (first use in this function); did you mean 'I2C_EVENT_MASTER_BYTE_TRANSMITTED'?
+     case I2C_EVENT_MASTER_BYTE_RECEIVED:
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          I2C_EVENT_MASTER_BYTE_TRANSMITTED
+../src/stm32f4xx_it.c:961:4: warning: implicit declaration of function 'I2C_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+    I2C_ClearITPendingBit(I2C2, I2C_IT_EVT);
+    ^~~~~~~~~~~~~~~~~~~~~
+    NVIC_ClearPendingIRQ
+../src/stm32f4xx_it.c: In function 'DMA1_Stream6_IRQHandler':
+../src/stm32f4xx_it.c:975:5: warning: implicit declaration of function 'DMA_GetITStatus' [-Wimplicit-function-declaration]
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET)
+     ^~~~~~~~~~~~~~~
+../src/stm32f4xx_it.c:975:35: error: 'DMA_IT_HTIF6' undeclared (first use in this function); did you mean 'DMA_HISR_HTIF6'?
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_HISR_HTIF6
+../src/stm32f4xx_it.c:979:4: warning: implicit declaration of function 'DMA_ClearITPendingBit'; did you mean 'NVIC_ClearPendingIRQ'? [-Wimplicit-function-declaration]
+    DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_HTIF6);
+    ^~~~~~~~~~~~~~~~~~~~~
+    NVIC_ClearPendingIRQ
+../src/stm32f4xx_it.c:983:35: error: 'DMA_IT_TCIF6' undeclared (first use in this function); did you mean 'DMA_IT_HTIF6'?
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_IT_HTIF6
+../src/stm32f4xx_it.c:991:35: error: 'DMA_IT_TEIF6' undeclared (first use in this function); did you mean 'DMA_IT_TCIF6'?
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TEIF6) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_IT_TCIF6
+../src/stm32f4xx_it.c:999:35: error: 'DMA_IT_FEIF6' undeclared (first use in this function); did you mean 'DMA_IT_TEIF6'?
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_FEIF6) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_IT_TEIF6
+../src/stm32f4xx_it.c:1007:35: error: 'DMA_IT_DMEIF6' undeclared (first use in this function); did you mean 'DMA_IT_FEIF6'?
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_DMEIF6) != RESET)
+                                   ^~~~~~~~~~~~~
+                                   DMA_IT_FEIF6
+../src/stm32f4xx_it.c: In function 'DMA2_Stream5_IRQHandler':
+../src/stm32f4xx_it.c:1027:35: error: 'DMA_IT_HTIF5' undeclared (first use in this function); did you mean 'DMA_HISR_HTIF5'?
+  if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_HTIF5) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_HISR_HTIF5
+../src/stm32f4xx_it.c:1035:35: error: 'DMA_IT_TCIF5' undeclared (first use in this function); did you mean 'DMA_IT_HTIF5'?
+  if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_TCIF5) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_IT_HTIF5
+../src/stm32f4xx_it.c:1043:35: error: 'DMA_IT_TEIF5' undeclared (first use in this function); did you mean 'DMA_IT_TCIF5'?
+  if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_TEIF5) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_IT_TCIF5
+../src/stm32f4xx_it.c:1051:35: error: 'DMA_IT_FEIF5' undeclared (first use in this function); did you mean 'DMA_IT_TEIF5'?
+  if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_FEIF5) != RESET)
+                                   ^~~~~~~~~~~~
+                                   DMA_IT_TEIF5
+../src/stm32f4xx_it.c:1059:35: error: 'DMA_IT_DMEIF5' undeclared (first use in this function); did you mean 'DMA_IT_FEIF5'?
+  if(DMA_GetITStatus(DMA2_Stream5, DMA_IT_DMEIF5) != RESET)
+                                   ^~~~~~~~~~~~~
+                                   DMA_IT_FEIF5
+make: *** [src/stm32f4xx_it.o] Error 1
+src/subdir.mk:42: recipe for target 'src/stm32f4xx_it.o' failed
+
+13:53:20 Build Finished (took 1s.674ms)
+
